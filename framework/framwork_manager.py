@@ -44,7 +44,11 @@ class FrameworkManager:
         self.optimizer_state_dict_file = file_tool.connect_path(checkpoint_path, 'optimizer.pt')
 
         if not arg_dict['repeat_train']:
-            self.framework.load_state_dict(torch.load(self.entire_model_state_dict_file))
+            if gpu_id == -1:
+                self.framework.load_state_dict(torch.load(file_tool.PathManager.change_filename_by_append
+                                                          (self.entire_model_state_dict_file, 'cpu')))
+            else:
+                self.framework.load_state_dict(torch.load(self.entire_model_state_dict_file))
             self.optimizer.load_state_dict(torch.load(self.optimizer_state_dict_file))
 
         self.logger = log_tool.get_logger(self.framework_logger_name,
@@ -60,7 +64,6 @@ class FrameworkManager:
         for item in framework_parameter_count_dict:
             self.logger.info('{:^20}{:^20}{:^20}{:^20}'.format(item['name'], item['total'], item['weight'], item['bias']))
         self.logger.info("*" * 80)
-        self.logger.info('\n')
 
     def create_framework(self):
         self.framework = self.get_framework()
@@ -94,6 +97,7 @@ class FrameworkManager:
         train_example_count = 0
         for b, batch in enumerate(loader):
             example_ids = batch['example_id']
+            example_ids[0,0] = 2075
             labels = batch['label'].to(device=self.device, dtype=self.framework.data_type)
             self.optimizer.zero_grad()
             # end_time = time.time()
@@ -112,7 +116,7 @@ class FrameworkManager:
             loss_avg += float(loss)
             train_accuracy_avg += train_correct_count
             train_example_count += len(labels)
-            print('epoch:{}  batch:{}  arg_loss:{}'.format(epoch + 1, b + 1, loss))
+            # print('epoch:{}  batch:{}  arg_loss:{}'.format(epoch + 1, b + 1, loss))
             # end_time = time.time()
             # print('time:{}'.format(end_time-start_time))
             # global_progress_bar.update((b+1)*100/len(train_loader))
@@ -238,6 +242,8 @@ class FrameworkManager:
         example_ids_fp = []
         for batch in data_loader:
             example_ids = batch['example_id']
+            if example_ids[0, 0] == 3585:
+                example_ids = example_ids
             labels = batch['label']
             # end_time = time.time()
             # print('time:{}'.format(end_time - start_time))
@@ -327,6 +333,7 @@ class FrameworkManager:
         def get_save_data(error_example_ids):
             save_data = []
             for e_id in error_example_ids:
+                e_id = str(e_id)
                 example = example_dict[e_id]
                 sentence1 = example.sentence1
                 sentence2 = example.sentence2
@@ -336,6 +343,7 @@ class FrameworkManager:
             return save_data
 
         test_loader = self.data_manager.test_loader(self.arg_dict['batch_size'])
+        self.logger.info('test_loader length:{}'.format(len(test_loader)))
         with torch.no_grad():
             evaluation_result = self.evaluation_calculation(test_loader)
             self.logger.info(evaluation_result['metric'])
@@ -345,7 +353,7 @@ class FrameworkManager:
             fn_sava_data = get_save_data(fn_error_example_ids)
             fp_sava_data = get_save_data(fp_error_example_ids)
 
-            error_file_path = file_tool.connect_path(self.framework.arg_dict['model_path'],'error_file')
+            error_file_path = file_tool.connect_path(self.framework.arg_dict['model_path'], 'error_file')
             file_tool.makedir(error_file_path)
 
             file_tool.save_list_data(fn_sava_data,

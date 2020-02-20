@@ -166,7 +166,7 @@ class DataManager:
         return self.create_loader(MyDateSet(self.test_example_manager.examples), batch_size=batch_size, example_dict=self.corpus.test_example_dict)
 
     def train_loader(self, batch_size):
-        return self.create_loader(MyDateSet(self.train_example_manager.examples), batch_size=batch_size)
+        return self.create_loader(MyDateSet(self.train_example_manager.examples), batch_size=batch_size, example_dict=self.corpus.train_example_dict)
 
     def get_loader_dict(self, k_fold=5, batch_size=1, force=False):
         if (self.loader_dict is None) or force:

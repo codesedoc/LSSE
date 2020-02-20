@@ -20,7 +20,10 @@ class Sentence:
         return len(self.parse_info['words'])
 
     def word_tokens(self):
-        return self.parse_info['words']
+        return self.parse_info['words'].copy()
+
+    def numeral_dependencies(self):
+        return self.syntax_info['dependencies'].copy()
 
 
 class Corpus:
