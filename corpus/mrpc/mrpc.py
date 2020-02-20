@@ -68,6 +68,9 @@ class Mrpc(base_corpus.Corpus):
         for sent_id in self.sentence_dict.keys():
             self.sentence_dict[sent_id].syntax_info = numeral_sentence_dict[sent_id]
 
+        print('the count of dep type:{}'.format(self.parse_info.dependency_count))
+        print('the max len of sentence_tokens:{}'.format(self.parse_info.max_sent_len))
+
         pass
 
 

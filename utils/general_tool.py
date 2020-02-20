@@ -1,5 +1,7 @@
 import math
 import numpy as np
+import torch
+import random
 
 
 def compare_two_dict_keys(dict1, dict2):
@@ -53,10 +55,19 @@ def get_global_position_encodings(length=100, dimension=300):
 #     sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2])  # dim 2i+1  奇数余弦
 #     return sinusoid_table
 
+
+def setup_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+
 def test():
     result1 = get_global_position_encodings(10, 6)
     # result2 = get_sinusoid_encoding_table(10, 6)
     pass
+
 
 if __name__ == '__main__':
     test()

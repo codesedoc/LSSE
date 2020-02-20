@@ -159,7 +159,7 @@ def dependencies2adj_matrix(numeral_dependencies, max_dep_kind, max_sent_len):
     numeral_dependencies = np.array(numeral_dependencies, dtype=np.int)
     dependencies_temp = numeral_dependencies[:, (2, 0, 1)]
     for dependency in dependencies_temp:
-        result[dependency.reshape(-1, 1).tolist()] = 1
+        result[tuple(dependency.reshape(-1, 1).tolist())] = 1
     return result
 
 

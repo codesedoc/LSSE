@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-import framework.base as base
+import framework as fr
 import time
 import utils.file_tool as file_tool
 import utils.parser_tool as parser_tool
@@ -10,7 +10,7 @@ import utils.data_tool as data_tool
 from model import *
 
 
-class LSSEFramework(base.Framework):
+class LSSEFramework(fr.Framework):
     def __init__(self, arg_dict):
         super().__init__(arg_dict)
 
@@ -49,19 +49,21 @@ class LSSEFramework(base.Framework):
                 gl = self.arg_dict['group_layer_limit_list']
             else:
                 gl = self.arg_dict['gcn_layer']
+
             model_dir = file_tool.connect_path(self.arg_dict['model_path'], 'bs:{}-lr:{}-gl:{}-gr:{}-fr:{}-br:{}-com_fun:{}'.
                                                format(self.arg_dict['batch_size'], self.arg_dict['learn_rate'], gl,
                                                       self.arg_dict['gcn_regular'],
                                                       self.arg_dict['fully_regular'], self.arg_dict['bert_regular'],
                                                       self.arg_dict['semantic_compare_func']), time_str)
+
             file_tool.makedir(model_dir)
             if not file_tool.check_dir(model_dir):
                 raise RuntimeError
-            arg_dict['model_path'] = model_dir
+            self.arg_dict['model_path'] = model_dir
 
     def create_models(self):
         self.bert = BertBase()
-        self.gcn = GCN(self.arg_dict)
+        self.gcn = GCNUndir(self.arg_dict)
         self.semantic_layer = SemanticLayer(self.arg_dict)
         self.fully_connection = FullyConnection(self.arg_dict)
 
@@ -75,7 +77,7 @@ class LSSEFramework(base.Framework):
                 adj_matrixs.append(parser_tool.dependencies2adj_matrix(s.syntax_info['dependencies'],
                                                                        self.arg_dict['dep_kind_count'],
                                                                        self.arg_dict['max_sentence_length']))
-                s_len = s.len_of_tokens()
+                s_len = len(s.word_tokens())
                 if s_len > sentence_max_len:
                     sentence_max_len = s_len
 
@@ -85,7 +87,6 @@ class LSSEFramework(base.Framework):
             adj_matrixs = adj_matrixs[..., 0:sentence_max_len, 0:sentence_max_len]
 
             return sentence_tokens_batch, adj_matrixs, sentence_max_len
-
 
         sentence1s = [e.sentence1 for e in examples]
         sentence2s = [e.sentence2 for e in examples]
@@ -121,16 +122,15 @@ class LSSEFramework(base.Framework):
         sep_index = data_batch['sep_index']
         adj_matrix1s = data_batch['adj_matrix1s']
         adj_matrix2s = data_batch['adj_matrix2s']
+        sentence_pair_reps, sentence1_reps, sentence2_reps = self.bert(sentence_pair_tokens, segment_ids, sep_index)
 
         def get_position_es(shape):
             position_encodings = general_tool.get_global_position_encodings(length=self.arg_dict['max_sentence_length'],
-                                                                                 dimension=self.arg_dict['bert_hidden_dim'])
+                                                                            dimension=self.arg_dict['bert_hidden_dim'])
             position_encodings = position_encodings[:shape[1]]
             position_encodings = torch.tensor(position_encodings, dtype=self.data_type,
                                               device=self.device).expand([shape[0], -1, -1])
             return position_encodings
-
-        sentence_pair_reps, sentence1_reps, sentence2_reps = self.bert(sentence_pair_tokens, segment_ids, sep_index)
 
         if self.arg_dict['position_encoding']:
             shape1 = sentence1_reps.size()
@@ -171,5 +171,56 @@ class LSSEFramework(base.Framework):
         adj_matrix2s = data_batch['adj_matrix2s']
 
         return sentence_pair_tokens, segment_ids, sep_index, adj_matrix1s, adj_matrix2s
+
+    def count_of_parameter(self):
+        with torch.no_grad():
+            self.cpu()
+            model_list = [self, self.bert, self.gcn, self.fully_connection]
+            parameter_counts = []
+            weight_counts = []
+            bias_counts = []
+            parameter_list = []
+            weights_list = []
+            bias_list = []
+            for model_ in model_list:
+                parameters_temp = model_.named_parameters()
+                weights_list.clear()
+                parameter_list.clear()
+                bias_list.clear()
+                for name, p in parameters_temp:
+                    # print(name)
+                    parameter_list.append(p.reshape(-1))
+                    if name.find('weight') != -1:
+                        weights_list.append(p.reshape(-1))
+                    if name.find('bias') != -1:
+                        bias_list.append(p.reshape(-1))
+                parameters = torch.cat(parameter_list, dim=0)
+                weights = torch.cat(weights_list, dim=0)
+                biases = torch.cat(bias_list, dim=0)
+                parameter_counts.append(len(parameters))
+                weight_counts.append(len(weights))
+                bias_counts.append(len(biases))
+            for p_count, w_count, b_count in zip(parameter_counts, weight_counts, bias_counts):
+                if p_count != w_count + b_count:
+                    raise ValueError
+
+            for kind in (parameter_counts, weight_counts, bias_counts):
+                total = kind[0]
+                others = kind[1:]
+                count_temp = 0
+                for other in others:
+                    count_temp += other
+                if total != count_temp:
+                    raise ValueError
+            self.to(self.device)
+
+            result = [
+                {'name': 'entire', 'total': parameter_counts[0], 'weight': weight_counts[0], 'bias': bias_counts[0]},
+                {'name': 'bert', 'total': parameter_counts[1], 'weight': weight_counts[1], 'bias': bias_counts[1]},
+                {'name': 'gcn', 'total': parameter_counts[2], 'weight': weight_counts[2], 'bias': bias_counts[2]},
+                {'name': 'fully', 'total': parameter_counts[3], 'weight': weight_counts[3], 'bias': bias_counts[3]},
+            ]
+
+            return result
 
 

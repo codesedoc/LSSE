@@ -1,90 +1,13 @@
 import torch
-from abc import abstractmethod
 import utils.data_tool as data_tool
 import utils.file_tool as file_tool
 import optuna
 import utils.log_tool as log_tool
 import utils.visualization_tool as visualization_tool
-import numpy as np
-import utils.SimpleProgressBar as progress_bar
-import time
-
-import framework
-
-
-class Loss(torch.nn.Module):
-    def __init__(self, arg_dict, regular_part_list, regular_factor_list):
-        super().__init__()
-        self.arg_dict = arg_dict
-        self.regular_flag = arg_dict['regular_flag']
-        self.regular_part_list = regular_part_list
-        self.regular_factor_list = regular_factor_list
-
-    def forward(self, model_outputs, labels):
-        model_outputs = model_outputs.reshape(labels.size())
-        cross_loss = torch.nn.BCELoss()(model_outputs, labels)
-        batch_size = self.arg_dict['batch_size']
-        regular_items = []
-        if self.regular_flag:
-            weights_list = []
-            for part, factor in zip(self.regular_part_list, self.regular_factor_list):
-                parameters_temp = part.named_parameters()
-                weights_list.clear()
-                for name, p in parameters_temp:
-                    # print(name)
-                    if (name.startswith('w') or name.find('weight') != -1) and (name.find('bias') == -1):
-                        weights_list.append(p.reshape(-1))
-                weights = torch.cat(weights_list, dim=0)
-                # print(len(weights))
-                para_sum = torch.pow(weights, 2).sum()
-                regular_items.append((factor*para_sum)/(2*batch_size))
-        result = cross_loss
-        for item in regular_items:
-            result += item
-        correct_count = 0
-        for output_, label in zip(model_outputs, labels):
-            if torch.abs(output_-label) < 0.5:
-                correct_count += 1
-        return result, correct_count
-
-
-class Framework(torch.nn.Module):
-    def __init__(self, arg_dict):
-        super().__init__()
-        self.arg_dict = self.create_arg_dict()
-        self.update_arg_dict(arg_dict)
-        self.data_type = self.arg_dict['dtype']
-        gpu_id = self.arg_dict['ues_gpu']
-        if gpu_id == -1:
-            self.device = torch.device('cpu')
-        else:
-            self.device = torch.device('cuda', gpu_id)
-
-    def update_arg_dict(self, arg_dict):
-        for name in arg_dict:
-            self.arg_dict[name] = arg_dict[name]
-
-
-    @abstractmethod
-    def create_arg_dict(self):
-        raise RuntimeError("have not implemented this abstract method")
-
-    @abstractmethod
-    def create_models(self):
-
-        raise RuntimeError("have not implemented this abstract method")
-
-    @abstractmethod
-    def deal_with_example_batch(self, example_ids):
-        raise RuntimeError("have not implemented this abstract method")
-
-    @abstractmethod
-    def get_regular_parts(self):
-        raise RuntimeError("have not implemented this abstract method")
-
-    @abstractmethod
-    def get_input_of_visualize_model(self, example_ids, example_dict):
-        raise RuntimeError("have not implemented this abstract method")
+import framework as fr
+# import numpy as np
+# import utils.SimpleProgressBar as progress_bar
+# import time
 
 
 class FrameworkManager:
@@ -101,37 +24,48 @@ class FrameworkManager:
         corpus = self.arg_dict['corpus']
         self.data_manager = data_tool.DataManager(corpus())
 
+        self.data_loader_dict = self.data_manager.get_loader_dict(k_fold=arg_dict['k_fold'],
+                                                                  batch_size=arg_dict['batch_size'], force=True)
+
         self.framework = None
-        self.entire_model_state_dict_file = None
-        self.optimizer_state_dict_file = None
-
-        self.create_models()
-        if not arg_dict['repeat_train']:
-            self.framework.load_state_dict(torch.load(self.entire_model_state_dict_file))
-            self.optimizer.load_state_dict(torch.load(self.optimizer_state_dict_file))
-
+        self.optimizer = None
+        self.create_framework()
+        self.loser = fr.BiCELo(self.arg_dict, *self.framework.get_regular_parts())
         self.framework_logger_name = 'framework_logger'
         if trial is not None:
             self.trial = trial
             self.trial_step = 0
             self.framework_logger_name += str(trial.number)
 
-        self.data_loader_dict = self.data_manager.get_loader_dict(k_fold=arg_dict['k_fold'],
-                                                                  batch_size=arg_dict['batch_size'], force=True)
-        if self.framework.arg_dict['model_path'] is not None:
-            model_path = self.framework.arg_dict['model_path']
-            self.entire_model_state_dict_file = file_tool.connect_path(model_path, 'checkpoint/entire_model.pt')
-            self.optimizer_state_dict_file = file_tool.connect_path(model_path, 'checkpoint/optimizer.pt')
+        checkpoint_path = file_tool.connect_path(self.framework.arg_dict['model_path'], 'checkpoint')
+        file_tool.makedir(checkpoint_path)
+
+        self.entire_model_state_dict_file = file_tool.connect_path(checkpoint_path, 'entire_model.pt')
+        self.optimizer_state_dict_file = file_tool.connect_path(checkpoint_path, 'optimizer.pt')
+
+        if not arg_dict['repeat_train']:
+            self.framework.load_state_dict(torch.load(self.entire_model_state_dict_file))
+            self.optimizer.load_state_dict(torch.load(self.optimizer_state_dict_file))
 
         self.logger = log_tool.get_logger(self.framework_logger_name,
                                           file_tool.connect_path(self.framework.arg_dict['model_path'], 'log.txt'))
 
-    def create_models(self):
-        self.framework = self.get_framework()
+        self.__print_framework_parameter__()
 
+    def __print_framework_parameter__(self):
+        framework_parameter_count_dict = self.framework.count_of_parameter()
+        self.logger.info("*" * 80)
+        self.logger.info('{:^80}'.format("NN parameter count"))
+        self.logger.info('{:^20}{:^20}{:^20}{:^20}'.format('model name', 'total', 'weight', 'bias'))
+        for item in framework_parameter_count_dict:
+            self.logger.info('{:^20}{:^20}{:^20}{:^20}'.format(item['name'], item['total'], item['weight'], item['bias']))
+        self.logger.info("*" * 80)
+        self.logger.info('\n')
+
+    def create_framework(self):
+        self.framework = self.get_framework()
         self.framework.create_models()
 
-        self.losser = Loss(self.arg_dict, *self.framework.get_regular_parts())
         gpu_id = self.arg_dict['ues_gpu']
         if gpu_id == -1:
             self.framework.cpu()
@@ -152,7 +86,7 @@ class FrameworkManager:
             arg_dict = self.arg_dict.copy()
             arg_dict['max_sentence_length'] = self.data_manager.get_max_sent_len()
             arg_dict['dep_kind_count'] = self.data_manager.get_max_dep_type()
-            return framework.LSSEFramework(arg_dict)
+            return fr.LSSEFramework(arg_dict)
 
     def __train_epoch__(self, epoch, loader):
         loss_avg = 0
@@ -166,7 +100,7 @@ class FrameworkManager:
             # print('time:{}'.format(end_time - start_time))
             # start_time = time.time()
             model_output = self.framework(example_ids, loader.example_dict)
-            loss, train_correct_count = self.losser(model_output, labels)
+            loss, train_correct_count = self.loser(model_output, labels)
             # end_time = time.time()
             # print('time:{}'.format(end_time-start_time))
             # start_time = time.time()
@@ -185,7 +119,7 @@ class FrameworkManager:
         # print()
         loss_avg = loss_avg / len(loader)
         train_accuracy_avg = train_accuracy_avg / train_example_count
-        return train_accuracy_avg, loss_avg
+        return float(train_accuracy_avg), float(loss_avg)
 
     def __train_fold__(self, train_loader, valid_loader):
         return_state = ""
@@ -199,7 +133,6 @@ class FrameworkManager:
         trial_count_report = 0
         trial_report_list = []
         try:
-            global global_progress_bar
             best_result = None
             for epoch in range(self.arg_dict['epoch']):
                 train_accuracy_avg, loss_avg = self.__train_epoch__(epoch, train_loader)
@@ -260,7 +193,6 @@ class FrameworkManager:
                     'max acc:{}  F1:{}  best epoch:{}'.format(max_accuracy, best_result['F1'], max_accuracy_e))
             else:
                 print('have not finished one epoch')
-        max_accuracy = float(max_accuracy)
 
         record_dict = {
             'train_acc': train_accuracy_list,
@@ -272,12 +204,12 @@ class FrameworkManager:
         return round(1 - max_accuracy, 4), epoch + 1, return_state, record_dict
 
     def train_model(self):
+        self.framework.print_arg_dict()
         self.logger.info('begin to train model')
         train_loader_tuple_list = self.data_loader_dict['train_loader_tuple_list']
         best_result = (1, 0, None)
         record_list = []
         for tuple_index, train_loader_tuple in enumerate(train_loader_tuple_list, 1):
-            self.create_models()
             train_loader, valid_loader = train_loader_tuple
             self.logger.info('train_loader:{}  valid_loader:{}'.format(len(train_loader), len(valid_loader)))
             self.logger.info('begin train {}-th fold'.format(tuple_index))
@@ -352,14 +284,14 @@ class FrameworkManager:
         metric_dict['TN'] = TN
         metric_dict['FP'] = FP
         metric_dict['FN'] = FN
-        metric_dict['accuracy'] = (TP + TN) / (TP + TN + FP + FN)
-        metric_dict['error'] = 1 - (TP + TN) / (TP + TN + FP + FN)
+        metric_dict['accuracy'] = float((TP + TN) / (TP + TN + FP + FN))
+        metric_dict['error'] = 1 - float((TP + TN) / (TP + TN + FP + FN))
         if TP == 0:
             metric_dict['recall'] = 0
             metric_dict['precision'] = 0
         else:
-            metric_dict['recall'] = TP / (TP + FN)
-            metric_dict['precision'] = TP / (TP + FP)
+            metric_dict['recall'] = float(TP / (TP + FN))
+            metric_dict['precision'] = float(TP / (TP + FP))
         if (metric_dict['recall'] + metric_dict['precision']) == 0:
             metric_dict['F1'] = 0
         else:
@@ -370,7 +302,7 @@ class FrameworkManager:
         return result
 
     def train_final_model(self):
-        self.create_models()
+        self.framework.print_arg_dict()
         self.logger.info('begin to train final model')
         train_loader = self.data_manager.train_loader(self.arg_dict['batch_size'])
         train_accuracy_list = []
@@ -413,10 +345,13 @@ class FrameworkManager:
             fn_sava_data = get_save_data(fn_error_example_ids)
             fp_sava_data = get_save_data(fp_error_example_ids)
 
-            file_tool.save_list_data(fn_sava_data, file_tool.connect_path(self.arg_dict['model_path'], 'error_file/fn_error_sentence_pairs.txt'),
-                                     'w')
-            file_tool.save_list_data(fp_sava_data, file_tool.connect_path(self.arg_dict['model_path'], 'error_file/fp_error_sentence_pairs.txt'),
-                                     'w')
+            error_file_path = file_tool.connect_path(self.framework.arg_dict['model_path'],'error_file')
+            file_tool.makedir(error_file_path)
+
+            file_tool.save_list_data(fn_sava_data,
+                                     file_tool.connect_path(error_file_path, 'fn_error_sentence_pairs.txt'), 'w')
+            file_tool.save_list_data(fp_sava_data,
+                                     file_tool.connect_path(error_file_path, 'fp_error_sentence_pairs.txt'), 'w')
             return evaluation_result['metric']
         pass
 

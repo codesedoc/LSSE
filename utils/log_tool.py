@@ -5,6 +5,14 @@ import math
 import sys
 
 
+def set_standard_format():
+    logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+
+
+def set_clear_format():
+    logging.basicConfig(format="")
+
+
 def get_logger(name=None, filename=None):
     if name is None:
         name = 'global_logger'

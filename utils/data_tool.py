@@ -125,6 +125,9 @@ class DataManager:
     def get_sentence_pair_by_id(self, sentence_ids):
         return self.get_sentence_by_id(sentence_ids[0]), self.get_sentence_by_id(sentence_ids[1])
 
+    def get_sentence_pair_by_e_id(self, e_id, example_dict):
+        return self.get_sentence_by_id(sentence_ids[0]), self.get_sentence_by_id(sentence_ids[1])
+
     def list_of_train_loader_tuple(self, k_fold, batch_size):
         if k_fold <= 1:
             return ValueError
@@ -295,5 +298,8 @@ def align_mult_sentence_tokens(mult_sentence_tokens, max_sentence_len, unk_token
     result = []
     for sentence_tokes in mult_sentence_tokens:
         result.append(align_sentence_tokens(sentence_tokes, max_sentence_len, unk_token))
+    for t in result:
+        if len(t) != len(result[0]):
+            raise ValueError("align defeat!")
     return result
 

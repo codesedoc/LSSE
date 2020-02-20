@@ -5,6 +5,7 @@ import pickle
 def get_absolute_path(file):
     return os.path.dirname(file)
 
+
 def load_data(file_name, model):
     with open(file_name, model) as f:
         rows = f.readlines()
@@ -25,6 +26,7 @@ def save_list_data(data, file_name, model):
         for d in data:
             f.write(d)
             f.write('\n')
+
 
 def save_data_pickle(data, file_name):
     with open(file_name, 'wb') as f:
