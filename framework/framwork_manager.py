@@ -5,7 +5,7 @@ import optuna
 import utils.log_tool as log_tool
 import utils.visualization_tool as visualization_tool
 import framework as fr
-# import numpy as np
+import numpy as np
 # import utils.SimpleProgressBar as progress_bar
 # import time
 
@@ -97,7 +97,6 @@ class FrameworkManager:
         train_example_count = 0
         for b, batch in enumerate(loader):
             example_ids = batch['example_id']
-            example_ids[0,0] = 2075
             labels = batch['label'].to(device=self.device, dtype=self.framework.data_type)
             self.optimizer.zero_grad()
             # end_time = time.time()
@@ -161,26 +160,28 @@ class FrameworkManager:
 
                 return_state = "finished_max_epoch"
                 # print(1.0 - train_accuracy_avg)
-                self.trial.report(1.0 - valid_accuracy, self.trial_step)
-                self.logger.info('trial_report:{} at step:{}'.format(1.0 - valid_accuracy, self.trial_step))
-                trial_report_list.append((1.0 - valid_accuracy, self.trial_step))
-                self.trial_step += 1
-                trial_count_report += 1
-                if self.trial.should_prune():
-                    raise optuna.exceptions.TrialPruned()
+                if hasattr(self, 'trial'):
+                    self.trial.report(1.0 - valid_accuracy, self.trial_step)
+                    self.logger.info('trial_report:{} at step:{}'.format(1.0 - valid_accuracy, self.trial_step))
+                    trial_report_list.append((1.0 - valid_accuracy, self.trial_step))
+                    self.trial_step += 1
+                    trial_count_report += 1
+                    if self.trial.should_prune():
+                        raise optuna.exceptions.TrialPruned()
 
                 if train_accuracy_avg >= 0.998:
-                    if self.trial.number < self.arg_dict['start_up_trials']:
-                        self.logger.info('trial_number: {} trial padding:{}'.format(self.trial.number,
-                                                                                    self.arg_dict['epoch'] - epoch - 1))
-                        for i in range(self.arg_dict['epoch'] - epoch - 1):
-                            self.trial.report(1.0 - valid_accuracy, self.trial_step)
-                            self.logger.info('trial_report:{} at step:{}'.format(1.0 - valid_accuracy, self.trial_step))
-                            trial_report_list.append((1.0 - valid_accuracy, self.trial_step))
-                            self.trial_step += 1
-                            trial_count_report += 1
-                            if self.trial.should_prune():
-                                raise optuna.exceptions.TrialPruned()
+                    if hasattr(self, 'trial'):
+                        if self.trial.number < self.arg_dict['start_up_trials']:
+                            self.logger.info('trial_number: {} trial padding:{}'.format(self.trial.number,
+                                                                                        self.arg_dict['epoch'] - epoch - 1))
+                            for i in range(self.arg_dict['epoch'] - epoch - 1):
+                                self.trial.report(1.0 - valid_accuracy, self.trial_step)
+                                self.logger.info('trial_report:{} at step:{}'.format(1.0 - valid_accuracy, self.trial_step))
+                                trial_report_list.append((1.0 - valid_accuracy, self.trial_step))
+                                self.trial_step += 1
+                                trial_count_report += 1
+                                if self.trial.should_prune():
+                                    raise optuna.exceptions.TrialPruned()
                     return_state = "over_fitting"
                     break
 
@@ -207,13 +208,23 @@ class FrameworkManager:
         }
         return round(1 - max_accuracy, 4), epoch + 1, return_state, record_dict
 
+    def __print_framework_arg_dict__(self):
+        self.logger.info("*"*80)
+        self.logger.info("framework args")
+        for key, value in self.arg_dict.items():
+            self.logger.info('{}: {}'.format(key, value))
+        self.logger.info("*" * 80)
+        self.logger.info('\n')
+
     def train_model(self):
-        self.framework.print_arg_dict()
+        self.__print_framework_arg_dict__()
         self.logger.info('begin to train model')
         train_loader_tuple_list = self.data_loader_dict['train_loader_tuple_list']
-        best_result = (1, 0, None)
+        avg_result = np.array([1, 0])
         record_list = []
         for tuple_index, train_loader_tuple in enumerate(train_loader_tuple_list, 1):
+            # repeat create framework
+            self.create_framework()
             train_loader, valid_loader = train_loader_tuple
             self.logger.info('train_loader:{}  valid_loader:{}'.format(len(train_loader), len(valid_loader)))
             self.logger.info('begin train {}-th fold'.format(tuple_index))
@@ -222,13 +233,14 @@ class FrameworkManager:
 
             self.trial_step = self.arg_dict['epoch'] * tuple_index
 
-            if result[0] < best_result[0]:
-                best_result = result[0:3]
+            avg_result += np.array(result[0:2])
             record_list.append(result[3])
 
-        record_file = file_tool.connect_path(self.arg_dict['model_path'], 'record_list.pkl')
+        record_file = file_tool.connect_path(self.framework.arg_dict['model_path'], 'record_list.pkl')
         file_tool.save_data_pickle(record_list, record_file)
-        return best_result
+        avg_result = (avg_result/len(train_loader_tuple_list)).tolist()
+        avg_result.append('finish')
+        return avg_result
 
     def evaluation_calculation(self, data_loader):
         TP = 0

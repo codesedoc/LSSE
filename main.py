@@ -15,7 +15,7 @@ def create_arg_dict():
         'k_fold': 4,
         'epoch': 4,
         'gcn_layer': 6,
-        'position_encoding': False,
+        'position_encoding': True,
         'ues_gpu': 0,
         'repeat_train': False,
         'corpus': corpus.mrpc.get_mrpc_obj,
@@ -23,7 +23,7 @@ def create_arg_dict():
         'regular_flag': True,
     }
     parser = argparse.ArgumentParser(description='LSSE')
-    parser.add_argument('-gpu', dest="ues_gpu", default='-1', type=int,
+    parser.add_argument('-gpu', dest="ues_gpu", default='0', type=int,
                         help='GPU order, if value is -1, it use cpu. Default value 0')
 
     args = parser.parse_args()
@@ -36,9 +36,9 @@ def create_arg_dict():
 def run_framework():
     arg_dict = create_arg_dict()
     framework_manager = fr.FrameworkManager(arg_dict)
-    # framework_manager.train_model()
+    framework_manager.train_model()
     # framework_manager.train_final_model()
-    framework_manager.test_model()
+    # framework_manager.test_model()
 
 def run_hyperor():
     arg_dict = create_arg_dict()
@@ -47,8 +47,8 @@ def run_hyperor():
 
 
 def main():
-    run_framework()
-    # run_hyperor()
+    # run_framework()
+    run_hyperor()
 
 
 if __name__ == '__main__':

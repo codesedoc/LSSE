@@ -63,7 +63,7 @@ class LSSEFramework(fr.Framework):
 
     def create_models(self):
         self.bert = BertBase()
-        self.gcn = GCNUndir(self.arg_dict)
+        self.gcn = GCN(self.arg_dict)
         self.semantic_layer = SemanticLayer(self.arg_dict)
         self.fully_connection = FullyConnection(self.arg_dict)
 
