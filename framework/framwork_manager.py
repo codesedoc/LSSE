@@ -55,6 +55,7 @@ class FrameworkManager:
                                           file_tool.connect_path(self.framework.arg_dict['model_path'], 'log.txt'))
 
         self.__print_framework_parameter__()
+        self.__print_framework_arg_dict__()
 
     def __print_framework_parameter__(self):
         framework_parameter_count_dict = self.framework.count_of_parameter()
@@ -217,7 +218,6 @@ class FrameworkManager:
         self.logger.info('\n')
 
     def train_model(self):
-        self.__print_framework_arg_dict__()
         self.logger.info('begin to train model')
         train_loader_tuple_list = self.data_loader_dict['train_loader_tuple_list']
         avg_result = np.array([1, 0])
