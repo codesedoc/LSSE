@@ -212,7 +212,7 @@ class FrameworkManager:
     def __print_framework_arg_dict__(self):
         self.logger.info("*"*80)
         self.logger.info("framework args")
-        for key, value in self.arg_dict.items():
+        for key, value in self.framework.arg_dict.items():
             self.logger.info('{}: {}'.format(key, value))
         self.logger.info("*" * 80)
         self.logger.info('\n')
@@ -220,10 +220,10 @@ class FrameworkManager:
     def train_model(self):
         self.logger.info('begin to train model')
         train_loader_tuple_list = self.data_loader_dict['train_loader_tuple_list']
-        avg_result = np.array([1, 0])
+        avg_result = np.array([1, 0],dtype=np.float)
         record_list = []
         for tuple_index, train_loader_tuple in enumerate(train_loader_tuple_list, 1):
-            # repeat create framework
+            #repeat create framework
             self.create_framework()
             train_loader, valid_loader = train_loader_tuple
             self.logger.info('train_loader:{}  valid_loader:{}'.format(len(train_loader), len(valid_loader)))
@@ -232,8 +232,7 @@ class FrameworkManager:
             result = self.__train_fold__(train_loader=train_loader, valid_loader=valid_loader)
 
             self.trial_step = self.arg_dict['epoch'] * tuple_index
-
-            avg_result += np.array(result[0:2])
+            avg_result += np.array(result[0:2], dtype=np.float)
             record_list.append(result[3])
 
         record_file = file_tool.connect_path(self.framework.arg_dict['model_path'], 'record_list.pkl')
