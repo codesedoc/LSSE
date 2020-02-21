@@ -62,7 +62,7 @@ class LSSEFramework(fr.Framework):
             self.arg_dict['model_path'] = model_dir
 
     def create_models(self):
-        self.bert = BertBase()
+        self.bert = ALBertBase()
         self.gcn = GCN(self.arg_dict)
         self.semantic_layer = SemanticLayer(self.arg_dict)
         self.fully_connection = FullyConnection(self.arg_dict)

@@ -223,7 +223,7 @@ class FrameworkManager:
         avg_result = np.array([1, 0],dtype=np.float)
         record_list = []
         for tuple_index, train_loader_tuple in enumerate(train_loader_tuple_list, 1):
-            #repeat create framework
+            #repeat create framework, when each fold train
             self.create_framework()
             train_loader, valid_loader = train_loader_tuple
             self.logger.info('train_loader:{}  valid_loader:{}'.format(len(train_loader), len(valid_loader)))
