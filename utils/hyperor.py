@@ -21,7 +21,7 @@ class Hyperor:
 
         logger_filename = file_tool.connect_path(self.study_path, 'log.txt')
         self.logger = log_tool.get_logger('my_optuna', logger_filename, log_format=logging.Formatter("%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
-        self.batch_size_list = [2, 4, 8, 16, 32]
+        self.batch_size_list = [4, 8, 16, 32]
         self.learn_rate_list = [5e-5, 1e-5, 8e-6, 4e-6, 2e-6]
         self.trial_times = 80
 
