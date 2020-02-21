@@ -13,7 +13,7 @@ def set_clear_format():
     logging.basicConfig(format="")
 
 
-def get_logger(name=None, filename=None):
+def get_logger(name=None, filename=None, log_format=None):
     if name is None:
         name = 'global_logger'
     if name not in logging.Logger.manager.loggerDict:
@@ -27,8 +27,13 @@ def get_logger(name=None, filename=None):
         file_handler.setLevel(logging.INFO)
         console_handler.setLevel(logging.INFO)
 
-        file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
-        console_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(filename)s[:%(lineno)d] - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
+        if log_format == None:
+            file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
+            # console_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(filename)s[:%(lineno)d] - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
+            console_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
+        else:
+            file_handler.setFormatter(log_format)
+            console_handler.setFormatter(log_format)
 
         logger.addHandler(file_handler)
         logger.addHandler(console_handler)

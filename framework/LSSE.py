@@ -50,16 +50,20 @@ class LSSEFramework(fr.Framework):
             else:
                 gl = self.arg_dict['gcn_layer']
 
-            model_dir = file_tool.connect_path(self.arg_dict['model_path'], 'bs:{}-lr:{}-gl:{}-gr:{}-fr:{}-br:{}-com_fun:{}'.
+            model_dir = file_tool.connect_path(self.arg_dict['model_path'], 'train',
+                                               'bs:{}-lr:{}-gl:{}-gr:{}-fr:{}-br:{}-com_fun:{}'.
                                                format(self.arg_dict['batch_size'], self.arg_dict['learn_rate'], gl,
                                                       self.arg_dict['gcn_regular'],
                                                       self.arg_dict['fully_regular'], self.arg_dict['bert_regular'],
                                                       self.arg_dict['semantic_compare_func']), time_str)
 
-            file_tool.makedir(model_dir)
-            if not file_tool.check_dir(model_dir):
-                raise RuntimeError
-            self.arg_dict['model_path'] = model_dir
+        else:
+            model_dir = file_tool.connect_path(self.arg_dict['model_path'], 'test')
+
+        file_tool.makedir(model_dir)
+        if not file_tool.check_dir(model_dir):
+            raise RuntimeError
+        self.arg_dict['model_path'] = model_dir
 
     def create_models(self):
         self.bert = ALBertBase()

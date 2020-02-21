@@ -220,7 +220,7 @@ class FrameworkManager:
     def train_model(self):
         self.logger.info('begin to train model')
         train_loader_tuple_list = self.data_loader_dict['train_loader_tuple_list']
-        avg_result = np.array([1, 0],dtype=np.float)
+        avg_result = np.array([0, 0], dtype=np.float)
         record_list = []
         for tuple_index, train_loader_tuple in enumerate(train_loader_tuple_list, 1):
             #repeat create framework, when each fold train
