@@ -21,17 +21,17 @@ class Hyperor:
 
         logger_filename = file_tool.connect_path(self.study_path, 'log.txt')
         self.logger = log_tool.get_logger('my_optuna', logger_filename, log_format=logging.Formatter("%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
-        self.batch_size_list = [2, 4, 8, 16]
-        self.learn_rate_list = [5e-5, 1e-5, 8e-6, 6e-6, 4e-6, 2e-6]
-        self.trial_times = 20
+        self.batch_size_list = [2, 4, 8, 16, 32]
+        self.learn_rate_list = [5e-5, 1e-5, 8e-6, 4e-6, 2e-6]
+        self.trial_times = 80
 
     def objective(self, trial):
         # general_tool.setup_seed(1234)
         arg_dict = {
             'batch_size': self.batch_size_list[int(trial.suggest_discrete_uniform('batch_size_index', 0, len(self.batch_size_list)-1, 1))],
             'learn_rate': self.learn_rate_list[int(trial.suggest_discrete_uniform('learn_rate_factor', 0, len(self.learn_rate_list)-1, 1))],
-            'gcn_layer': int(trial.suggest_discrete_uniform('gcn_hidden_layer', 2, 4, 1)),
-            'epoch': 40,
+            'gcn_layer': int(trial.suggest_discrete_uniform('gcn_hidden_layer', 2, 8, 1)),
+            'epoch': 50,
             'repeat_train': True,
             'ues_gpu': 0,
         }

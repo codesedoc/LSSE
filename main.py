@@ -8,16 +8,16 @@ import utils.general_tool as general_tool
 def create_arg_dict():
     general_tool.setup_seed(1234)
     arg_dict = {
-        'batch_size': 4,
+        'batch_size': 32,
         'learn_rate': 8e-6,
         # 'sgd_momentum': 0.4,
         'optimizer': 'adam',
         'k_fold': 4,
         'epoch': 4,
-        'gcn_layer': 6,
+        'gcn_layer': 10,
         'position_encoding': True,
         'dropout': 0.5,
-        'regular_flag': True,
+        'regular_flag': False,
         'ues_gpu': 0,
         'repeat_train': True,
         'corpus': corpus.mrpc.get_mrpc_obj,
@@ -49,8 +49,8 @@ def run_hyperor():
 
 
 def main():
-    run_framework()
-    # run_hyperor()
+    # run_framework()
+    run_hyperor()
 
 
 if __name__ == '__main__':
