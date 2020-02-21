@@ -86,7 +86,7 @@ class LSSEFramework(fr.Framework):
                     sentence_max_len = s_len
 
             sentence_tokens_batch = data_tool.align_mult_sentence_tokens(sentence_tokens_batch, sentence_max_len,
-                                                                         self.bert.tokenizer.unk_token)
+                                                                         self.bert.tokenizer.unk_token, direction='left')
             adj_matrixs = np.array(adj_matrixs)
             adj_matrixs = adj_matrixs[..., 0:sentence_max_len, 0:sentence_max_len]
 

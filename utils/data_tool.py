@@ -287,19 +287,19 @@ class DataManager:
                 check_valid_two_tuple(data_loader_tuple_list[i], data_loader_tuple_list[j])
 
 
-def align_sentence_tokens(sentence_token, max_sentence_len, unk_token, direction='right'):
+def align_sentence_tokens(sentence_token, max_sentence_len, unk_token, direction='left'):
     result = list(sentence_token.copy())
     for i in range(len(result), max_sentence_len):
-        if direction == 'right':
+        if direction == 'left':
             result.append(unk_token)
-        elif direction == 'left':
+        elif direction == 'right':
             result.insert(0, unk_token)
         else:
             raise ValueError("Unknow direction parameter")
     return tuple(result)
 
 
-def align_mult_sentence_tokens(mult_sentence_tokens, max_sentence_len, unk_token, direction='right'):
+def align_mult_sentence_tokens(mult_sentence_tokens, max_sentence_len, unk_token, direction='left'):
     result = []
     for sentence_tokes in mult_sentence_tokens:
         result.append(align_sentence_tokens(sentence_tokes, max_sentence_len, unk_token, direction=direction))

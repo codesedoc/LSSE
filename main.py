@@ -8,7 +8,7 @@ import utils.general_tool as general_tool
 def create_arg_dict():
     general_tool.setup_seed(1234)
     arg_dict = {
-        'batch_size': 8,
+        'batch_size': 4,
         'learn_rate': 8e-6,
         # 'sgd_momentum': 0.4,
         'optimizer': 'adam',
@@ -16,11 +16,13 @@ def create_arg_dict():
         'epoch': 4,
         'gcn_layer': 6,
         'position_encoding': True,
+        'dropout': 0.5,
+        'regular_flag': True,
         'ues_gpu': 0,
         'repeat_train': True,
         'corpus': corpus.mrpc.get_mrpc_obj,
         'framework_name': "LSSE",
-        'regular_flag': True,
+
     }
     parser = argparse.ArgumentParser(description='LSSE')
     parser.add_argument('-gpu', dest="ues_gpu", default='0', type=int,
@@ -47,8 +49,8 @@ def run_hyperor():
 
 
 def main():
-    # run_framework()
-    run_hyperor()
+    run_framework()
+    # run_hyperor()
 
 
 if __name__ == '__main__':

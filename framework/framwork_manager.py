@@ -239,6 +239,7 @@ class FrameworkManager:
         file_tool.save_data_pickle(record_list, record_file)
         avg_result = (avg_result/len(train_loader_tuple_list)).tolist()
         avg_result.append('finish')
+        self.logger.info('avg_acc:{}'.format(avg_result[0]))
         return avg_result
 
     def evaluation_calculation(self, data_loader):

@@ -16,6 +16,11 @@ class GCN(torch.nn.Module):
         self.group_layer_limit_flag = arg_dict['group_layer_limit_flag']
         if self.group_layer_limit_flag:
             self.dep_layer_limit_list = arg_dict['dep_layer_limit_list']
+        self.gate_activity = torch.sigmoid
+        self.activity = torch.relu
+        if self.arg_dict['dropout'] != 1.0:
+            self.dropout = torch.nn.Dropout(self.arg_dict['dropout'])
+
         gpu_id = arg_dict['ues_gpu']
         if gpu_id == -1:
             self.device = torch.device('cpu')
@@ -36,18 +41,20 @@ class GCN(torch.nn.Module):
 
         if self.gate_flag:
             self.weight_gate_in_list = torch.nn.ParameterList(self.get_para_list(self.layer * self.dep_kind_count,
-                                                                                 (self.hidden_dim, self.hidden_dim)))
+                                                                                 (1, self.hidden_dim)))
             self.weight_gate_out_list = torch.nn.ParameterList(self.get_para_list(self.layer * self.dep_kind_count,
-                                                                                  (self.hidden_dim, self.hidden_dim)))
+                                                                                  (1, self.hidden_dim)))
 
             self.bias_gate_in_list = torch.nn.ParameterList(self.get_para_list(self.layer * self.dep_kind_count,
-                                                                               (self.hidden_dim, 1)))
+                                                                               (1, 1)))
             self.bias_gate_out_list = torch.nn.ParameterList(self.get_para_list(self.layer * self.dep_kind_count,
-                                                                                (self.hidden_dim, 1)))
+                                                                                (1, 1)))
 
         if self.self_loop_flag:
             self.weight_loop_list = torch.nn.ParameterList(self.get_para_list(self.layer,
-                                                                              (self.hidden_dim, self.hidden_dim)))
+                                                           (self.hidden_dim, self.hidden_dim)))
+            if self.gate_flag:
+                self.weight_loop_gate_list = torch.nn.ParameterList(self.get_para_list(self.layer, (1, self.hidden_dim)))
 
     def get_para_list(self, length, shape):
         return [
@@ -61,15 +68,21 @@ class GCN(torch.nn.Module):
                 z = torch.baddbmm(bias_gate_list[index].expand([current_batch_size, -1, -1]),
                                   batch1=weight_gate_list[index].expand([current_batch_size, -1, -1]),
                                   batch2=h)
-                gate = torch.sigmoid(z)
+                gate = self.gate_activity(z)
             else:
                 gate = 1
 
-            relation = self.norm_item * gate * torch.baddbmm(
+            relation = torch.baddbmm(
                 bias_list[index].expand([current_batch_size, -1, -1]),
                 batch1=weight_list[index].expand([current_batch_size, -1, -1]),
                 batch2=h)
-            relation = torch.bmm(relation, adj_matrix[:, d_kind].type(relation.dtype))
+
+            if hasattr(self, 'dropout'):
+                relation = self.dropout(relation)
+
+            relation = self.norm_item * gate * relation
+
+            relation = torch.bmm(relation, adj_matrix[:, d_kind])
             return relation
 
         adj_matrix_in = adj_matrix
@@ -81,8 +94,17 @@ class GCN(torch.nn.Module):
             # print(layer)
             if self.self_loop_flag:
                 sum_ = torch.bmm(self.weight_loop_list[layer].expand([current_batch_size, -1, -1]), hidden)
+
+                if hasattr(self, 'dropout'):
+                    sum_ = self.dropout(sum_)
+
+                if self.gate_flag:
+                    z = torch.bmm(self.weight_loop_gate_list[layer].expand([current_batch_size, -1, -1]), hidden)
+                    loop_gate = self.gate_activity(z)
+                    sum_ *= loop_gate
             else:
                 sum_ = 0
+
             for dep_kind in range(self.dep_kind_count):
                 if self.group_layer_limit_flag:
                     if layer + 1 > self.dep_layer_limit_list[dep_kind]:
@@ -104,7 +126,7 @@ class GCN(torch.nn.Module):
 
                 sum_ += result2
 
-            hidden = torch.relu(sum_)
+            hidden = self.activity(sum_)
 
         return hidden.permute(0, 2, 1)
 
@@ -124,6 +146,12 @@ class GCNUndir(torch.nn.Module):
         self.group_layer_limit_flag = arg_dict['group_layer_limit_flag']
         if self.group_layer_limit_flag:
             self.dep_layer_limit_list = arg_dict['dep_layer_limit_list']
+
+        self.gate_activity = torch.sigmoid
+        self.activity = torch.relu
+        if self.arg_dict['dropout'] != 1.0:
+            self.dropout = torch.nn.Dropout(self.arg_dict['dropout'])
+
         gpu_id = arg_dict['ues_gpu']
         if gpu_id == -1:
             self.device = torch.device('cpu')
@@ -137,13 +165,15 @@ class GCNUndir(torch.nn.Module):
 
         if self.gate_flag:
             self.weight_gate_list = torch.nn.ParameterList(self.get_para_list(self.layer * self.dep_kind_count,
-                                                                              (self.hidden_dim, self.hidden_dim)))
+                                                                              (1, self.hidden_dim)))
             self.bias_gate_list = torch.nn.ParameterList(self.get_para_list(self.layer * self.dep_kind_count,
-                                                                            (self.hidden_dim, 1)))
+                                                                            (1, 1)))
 
         if self.self_loop_flag:
             self.weight_loop_list = torch.nn.ParameterList(self.get_para_list(self.layer,
                                                                               (self.hidden_dim, self.hidden_dim)))
+            if self.gate_flag:
+                self.weight_loop_gate_list = torch.nn.ParameterList(self.get_para_list(self.layer, (1, self.hidden_dim)))
 
     def get_para_list(self, length, shape):
         return [
@@ -160,8 +190,17 @@ class GCNUndir(torch.nn.Module):
             # print(layer)
             if self.self_loop_flag:
                 sum_ = torch.bmm(self.weight_loop_list[layer].expand([current_batch_size, -1, -1]), hidden)
+
+                if hasattr(self, 'dropout'):
+                    sum_ = self.dropout(sum_)
+
+                if self.gate_flag:
+                    z = torch.bmm(self.weight_loop_gate_list[layer].expand([current_batch_size, -1, -1]), hidden)
+                    loop_gate = self.gate_activity(z)
+                    sum_ *= loop_gate
             else:
                 sum_ = 0
+
             for dep_kind in range(self.dep_kind_count):
                 if self.group_layer_limit_flag:
                     if layer + 1 > self.dep_layer_limit_list[dep_kind]:
@@ -172,7 +211,7 @@ class GCNUndir(torch.nn.Module):
                     z = torch.baddbmm(self.bias_gate_list[para_list_index].expand([current_batch_size, -1, -1]),
                                       batch1=self.weight_gate_list[para_list_index].expand(
                                           [current_batch_size, -1, -1]), batch2=hidden)
-                    gate = torch.sigmoid(z)
+                    gate = self.gate_activity(z)
                     relation_in = self.norm_item * gate * torch.baddbmm(
                         self.bias_list[para_list_index].expand([current_batch_size, -1, -1]),
                         batch1=self.weight_list[para_list_index].expand([current_batch_size, -1, -1]),
@@ -184,6 +223,6 @@ class GCNUndir(torch.nn.Module):
                         batch2=hidden)
                     relation_out = torch.bmm(relation_out, adj_matrix_out[:, dep_kind].type(relation_out.dtype))
                     sum_ += relation_in + relation_out
-            hidden = torch.relu(sum_)
+            hidden = self.activity(sum_)
 
         return hidden.permute(0, 2, 1)
