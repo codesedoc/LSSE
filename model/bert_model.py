@@ -23,13 +23,14 @@ class BertBase(torch.nn.Module):
 class ALBertBase(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        self.bert = torch.hub.load('huggingface/pytorch-transformers', 'model', 'albert-base-v2')
+        self.model = torch.hub.load('huggingface/pytorch-transformers', 'model', 'albert-base-v2')
         self.tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'albert-base-v2')
-        self.tokenizer.do_lower_case = False
+        # default lower_case
+        # self.tokenizer.do_lower_case = False
         pass
 
     def forward(self, sentence_tokens, segment_ids, sep_index):
-        last_hidden_states, _ = self.bert(sentence_tokens, token_type_ids=segment_ids)
+        last_hidden_states, _ = self.model(sentence_tokens, token_type_ids=segment_ids)
 
         if torch.isnan(last_hidden_states).sum() > 0:
             print(torch.isnan(last_hidden_states))
