@@ -14,7 +14,7 @@ def create_arg_dict():
         'optimizer': 'adam',
         'k_fold': 4,
         'epoch': 4,
-        'gcn_layer': 1,
+        'gcn_layer': 6,
         'position_encoding': True,
         'ues_gpu': 0,
         'repeat_train': True,
@@ -47,8 +47,8 @@ def run_hyperor():
 
 
 def main():
-    run_framework()
-    # run_hyperor()
+    # run_framework()
+    run_hyperor()
 
 
 if __name__ == '__main__':

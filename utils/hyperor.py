@@ -4,22 +4,24 @@ import math
 import utils.general_tool as general_tool
 import torch
 import framework as fr
+import utils.log_tool as log_tool
+import logging
 
 
 class Hyperor:
     def __init__(self, arg_dict):
         super().__init__()
         self.arg_dict = arg_dict
-        self.study_path = file_tool.connect_path("result/optuna", self.arg_dict['framework_name'])
+        self.study_path = file_tool.connect_path("result", self.arg_dict['framework_name'], 'optuna')
         file_tool.makedir(self.study_path)
         self.study = optuna.create_study(study_name=self.arg_dict['framework_name'],
                                          storage='sqlite:///' + file_tool.connect_path(self.study_path, 'study_hyper_parameter.db'),
                                          load_if_exists=True,
                                          pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=10))
 
-        self.arg_dict['start_up_trials'] = self.study.pruner._n_startup_trials
-
-        self.batch_size_list = [2, 4, 8]
+        logger_filename = file_tool.connect_path(self.study_path, 'log.txt')
+        self.logger = log_tool.get_logger('my_optuna', logger_filename, log_format=logging.Formatter("%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
+        self.batch_size_list = [2, 4, 8, 16]
         self.learn_rate_list = [5e-5, 1e-5, 8e-6, 6e-6, 4e-6, 2e-6]
         self.trial_times = 20
 
@@ -36,20 +38,34 @@ class Hyperor:
 
         self.arg_dict.update(arg_dict)
 
-        framework_manager = fr.FrameworkManager(arg_dict=self.arg_dict, trial=trial)
-
         if trial.number > 0:
-            framework_manager.logger.info(self.study.best_trial)
+            self.log_trial(self.study.best_trial, 'best trial info')
 
+        framework_manager = fr.FrameworkManager(arg_dict=self.arg_dict, trial=trial)
         result, last_epoch, return_state = framework_manager.train_model()
-        trial.set_user_attr('accuracy', 1 - result)
-        trial.set_user_attr('last_epoch', last_epoch)
+        trial.set_user_attr('avg_accuracy', 1 - result)
+        trial.set_user_attr('avg_epoch', last_epoch)
         trial.set_user_attr('return_state', return_state)
         torch.cuda.empty_cache()
+        self.log_trial(trial, 'current trial info')
+
         return result
+
+    def log_trial(self, trial, head=None):
+        self.logger.info('*'*80)
+        if head is not None:
+            self.logger.info(str(head))
+
+        self.logger.info('number:{}'.format(trial.number))
+        self.logger.info('user_attrs:{}'.format(trial.user_attrs))
+        self.logger.info('params:{}'.format(trial.params))
+        if hasattr(trial, 'state'):
+            self.logger.info('state:{}'.format(trial.state))
+        self.logger.info('*'*80+'\n')
 
     def tune_hyper_parameter(self):
         self.study.optimize(self.objective, n_trials=self.trial_times)
+        self.log_trial(self.study.best_trial, 'best trial info')
         self.study.set_user_attr('learn_rate_list', self.learn_rate_list)
         self.study.set_user_attr('batch_size_list', self.batch_size_list)
         file_tool.save_data_pickle(self.study, file_tool.connect_path(self.study_path, 'study_hyper_parameter.pkls'))
