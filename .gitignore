@@ -20,4 +20,5 @@ result/visualization
 /**/log
 /**/*.pt
 /**/*.pkls
+/**/*.db
 #/**/result
