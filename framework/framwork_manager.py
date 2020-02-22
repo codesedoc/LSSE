@@ -353,7 +353,7 @@ class FrameworkManager:
                 example = example_dict[e_id]
                 sentence1 = example.sentence1
                 sentence2 = example.sentence2
-                save_data.append(str(sentence1.id, sentence2.id))
+                save_data.append(str([sentence1.id, sentence2.id]))
                 save_data.append(sentence1.original)
                 save_data.append(sentence2.original)
             return save_data

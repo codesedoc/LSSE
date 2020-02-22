@@ -35,7 +35,7 @@ class SeE(fr.LSeE):
         return arg_dict
 
     def create_models(self):
-        self.bert = ALBertBase()
+        self.bert = BertBase()
         self.fully_connection = BertFineTuneConnection(self.arg_dict)
 
     def update_arg_dict(self, arg_dict):
@@ -66,11 +66,11 @@ class SeE(fr.LSeE):
         else:
             sentence_pair_tokens, segment_ids, sep_index = input_data
 
-        sentence_pair_reps, _, _ = self.bert(sentence_pair_tokens, segment_ids, sep_index)
+        _1, _2, _3, pooler_output = self.bert(sentence_pair_tokens, segment_ids, sep_index)
 
         # star_time = time.time()
-
-        result = self.fully_connection(sentence_pair_reps)
+        pooler_output = self.bert.dropout(pooler_output)
+        result = self.fully_connection(pooler_output)
         return result
 
 
