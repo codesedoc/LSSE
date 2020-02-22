@@ -10,13 +10,14 @@ import utils.data_tool as data_tool
 from model import *
 
 
-class LSyE(fr.Framework):
+class LSyE(fr.LSSE):
     name = "LSyE"
+    result_path = file_tool.connect_path('result', name)
 
     def __init__(self, arg_dict):
         super().__init__(arg_dict)
         self.name = LSyE.name
-        self.result_path = file_tool.connect_path('result', LSyE.name)
+        self.result_path = LSyE.result_path
 
     @classmethod
     def framework_name(cls):
@@ -41,99 +42,20 @@ class LSyE(fr.Framework):
             'gcn_hidden_dim': 768,
             'bert_hidden_dim': 768,
             'dtype': torch.float32,
-            'model_path': "result/LSyE",
         }
         return arg_dict
 
-    def update_arg_dict(self, arg_dict):
-        super().update_arg_dict(arg_dict)
-        if self.arg_dict['concatenate_input_for_gcn_hidden']:
-            self.arg_dict['fully_scales'][0] += self.arg_dict['gcn_hidden_dim']
-
-        if self.arg_dict['repeat_train']:
-            time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
-            if self.arg_dict['group_layer_limit_flag']:
-                gl = self.arg_dict['group_layer_limit_list']
-            else:
-                gl = self.arg_dict['gcn_layer']
-
-            model_dir = file_tool.connect_path(self.result_path, 'train',
-                                               'bs:{}-lr:{}-gl:{}-gr:{}-fr:{}-br:{}-com_fun:{}'.
-                                               format(self.arg_dict['batch_size'], self.arg_dict['learn_rate'], gl,
-                                                      self.arg_dict['gcn_regular'],
-                                                      self.arg_dict['fully_regular'], self.arg_dict['bert_regular'],
-                                                      self.arg_dict['semantic_compare_func']), time_str)
-
+    def forward(self, *input_data, **kwargs):
+        if len(kwargs) == 5: # common run or visualization
+            data_batch = kwargs
+            sentence_pair_tokens = data_batch['sentence_pair_tokens_batch']
+            segment_ids = data_batch['segment_ids']
+            sep_index = data_batch['sep_index']
+            adj_matrix1s = data_batch['adj_matrix1s']
+            adj_matrix2s = data_batch['adj_matrix2s']
         else:
-            model_dir = file_tool.connect_path(self.result_path, 'test')
+            sentence_pair_tokens, segment_ids, sep_index, adj_matrix1s, adj_matrix2s = input_data
 
-        file_tool.makedir(model_dir)
-        if not file_tool.check_dir(model_dir):
-            raise RuntimeError
-        self.arg_dict['model_path'] = model_dir
-
-    def create_models(self):
-        self.bert = ALBertBase()
-        self.gcn = GCN(self.arg_dict)
-        self.semantic_layer = SemanticLayer(self.arg_dict)
-        self.fully_connection = FullyConnection(self.arg_dict)
-
-    def deal_with_example_batch(self, example_ids, example_dict):
-        examples = [example_dict[str(e_id.item())] for e_id in example_ids]
-        def get_sentence_input_info(sentences):
-            sentence_tokens_batch = []
-            adj_matrixs = []
-            sentence_max_len = 0
-            for s in sentences:
-                sentence_tokens_batch.append(s.word_tokens())
-                adj_matrixs.append(parser_tool.dependencies2adj_matrix(s.syntax_info['dependencies'],
-                                                                       self.arg_dict['dep_kind_count'],
-                                                                       self.arg_dict['max_sentence_length']))
-                s_len = len(s.word_tokens())
-                if s_len > sentence_max_len:
-                    sentence_max_len = s_len
-
-            sentence_tokens_batch = data_tool.align_mult_sentence_tokens(sentence_tokens_batch, sentence_max_len,
-                                                                         self.bert.tokenizer.unk_token, direction='left')
-            adj_matrixs = np.array(adj_matrixs)
-            adj_matrixs = adj_matrixs[..., 0:sentence_max_len, 0:sentence_max_len]
-
-            return sentence_tokens_batch, adj_matrixs, sentence_max_len
-
-        sentence1s = [e.sentence1 for e in examples]
-        sentence2s = [e.sentence2 for e in examples]
-
-        sentence_tokens_batch1, adj_matrix1s, sent_max_len1 = get_sentence_input_info(sentence1s)
-        sentence_tokens_batch2, adj_matrix2s, sent_max_len2 = get_sentence_input_info(sentence2s)
-
-        sentence_pair_tokens_batch = torch.tensor([self.bert.tokenizer.encode(s1, s2, add_special_tokens=True)
-                                                  for s1, s2 in zip(sentence_tokens_batch1, sentence_tokens_batch2)],
-                                                  device=self.device)
-
-        segment_ids = torch.cat([torch.zeros(sent_max_len1 + 2), torch.ones(sent_max_len2 + 1)]).to(
-            device=self.device, dtype=torch.long)
-        sep_index = sent_max_len1 + 1
-
-        adj_matrix1s = torch.from_numpy(adj_matrix1s).to(device=self.device, dtype=self.data_type)
-        adj_matrix2s = torch.from_numpy(adj_matrix2s).to(device=self.device, dtype=self.data_type)
-        result = {
-            'adj_matrix1s': adj_matrix1s,
-            'adj_matrix2s': adj_matrix2s,
-            'sentence_pair_tokens_batch': sentence_pair_tokens_batch,
-            'segment_ids': segment_ids,
-            'sep_index': sep_index,
-        }
-        return result
-
-    def forward(self, example_ids, example_dict):
-        examples = [example_dict[str(e_id.item())] for e_id in example_ids]
-
-        data_batch = self.deal_with_example_batch(examples)
-        sentence_pair_tokens = data_batch['sentence_pair_tokens_batch']
-        segment_ids = data_batch['segment_ids']
-        sep_index = data_batch['sep_index']
-        adj_matrix1s = data_batch['adj_matrix1s']
-        adj_matrix2s = data_batch['adj_matrix2s']
         _, sentence1_reps, sentence2_reps = self.bert(sentence_pair_tokens, segment_ids, sep_index)
 
         def get_position_es(shape):
@@ -162,71 +84,5 @@ class LSyE(fr.Framework):
 
         result = self.fully_connection(result)
         return result
-
-    def get_regular_parts(self):
-        regular_part_list = (self.gcn, self.fully_connection, self.bert)
-        regular_factor_list = (self.arg_dict['gcn_regular'], self.arg_dict['fully_regular'], self.arg_dict['bert_regular'])
-        return regular_part_list, regular_factor_list
-
-    def get_input_of_visualize_model(self, example_ids, example_dict):
-        data_batch = self.deal_with_example_batch(example_ids, example_dict)
-        sentence_pair_tokens = data_batch['sentence_pair_tokens']
-        segment_ids = data_batch['segment_ids']
-        sep_index = data_batch['sep_index']
-        adj_matrix1s = data_batch['adj_matrix1s']
-        adj_matrix2s = data_batch['adj_matrix2s']
-
-        return sentence_pair_tokens, segment_ids, sep_index, adj_matrix1s, adj_matrix2s
-
-    def count_of_parameter(self):
-        with torch.no_grad():
-            self.cpu()
-            model_list = [self, self.bert, self.gcn, self.fully_connection]
-            parameter_counts = []
-            weight_counts = []
-            bias_counts = []
-            parameter_list = []
-            weights_list = []
-            bias_list = []
-            for model_ in model_list:
-                parameters_temp = model_.named_parameters()
-                weights_list.clear()
-                parameter_list.clear()
-                bias_list.clear()
-                for name, p in parameters_temp:
-                    # print(name)
-                    parameter_list.append(p.reshape(-1))
-                    if name.find('weight') != -1:
-                        weights_list.append(p.reshape(-1))
-                    if name.find('bias') != -1:
-                        bias_list.append(p.reshape(-1))
-                parameters = torch.cat(parameter_list, dim=0)
-                weights = torch.cat(weights_list, dim=0)
-                biases = torch.cat(bias_list, dim=0)
-                parameter_counts.append(len(parameters))
-                weight_counts.append(len(weights))
-                bias_counts.append(len(biases))
-            for p_count, w_count, b_count in zip(parameter_counts, weight_counts, bias_counts):
-                if p_count != w_count + b_count:
-                    raise ValueError
-
-            for kind in (parameter_counts, weight_counts, bias_counts):
-                total = kind[0]
-                others = kind[1:]
-                count_temp = 0
-                for other in others:
-                    count_temp += other
-                if total != count_temp:
-                    raise ValueError
-            self.to(self.device)
-
-            result = [
-                {'name': 'entire', 'total': parameter_counts[0], 'weight': weight_counts[0], 'bias': bias_counts[0]},
-                {'name': 'bert', 'total': parameter_counts[1], 'weight': weight_counts[1], 'bias': bias_counts[1]},
-                {'name': 'gcn', 'total': parameter_counts[2], 'weight': weight_counts[2], 'bias': bias_counts[2]},
-                {'name': 'fully', 'total': parameter_counts[3], 'weight': weight_counts[3], 'bias': bias_counts[3]},
-            ]
-
-            return result
 
 

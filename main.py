@@ -16,17 +16,17 @@ def create_arg_dict():
         'optimizer': 'adam',
         'k_fold': 4,
         'epoch': 4,
-        'gcn_layer': 1,
-        'position_encoding': True,
+        # 'gcn_layer': 1,
+        # 'position_encoding': True,
         'dropout': 0.5,
         'regular_flag': False,
         'ues_gpu': 0,
         'repeat_train': True,
         'corpus': corpus.mrpc.get_mrpc_obj,
-        'framework_name': "LSSE",
+        'framework_name': "LE",
 
     }
-    parser = argparse.ArgumentParser(description='LSSE')
+    parser = argparse.ArgumentParser(description='PIRs')
     parser.add_argument('-gpu', dest="ues_gpu", default='0', type=int,
                         help='GPU order, if value is -1, it use cpu. Default value 0')
 
@@ -41,10 +41,10 @@ def run_framework():
     # raise ValueError('my error!')
     arg_dict = create_arg_dict()
     framework_manager = fr.FrameworkManager(arg_dict)
-    # framework_manager.train_model()
+    framework_manager.train_model()
     # framework_manager.train_final_model()
     # framework_manager.test_model()
-    framework_manager.visualize_model()
+    # framework_manager.visualize_model()
 
 def run_hyperor():
     arg_dict = create_arg_dict()
