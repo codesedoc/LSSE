@@ -3,6 +3,7 @@ import framework as fr
 import argparse
 import utils.hyperor as hyperor
 import utils.general_tool as general_tool
+import torch
 
 
 def create_arg_dict():
@@ -36,6 +37,7 @@ def create_arg_dict():
 
 
 def run_framework():
+    raise ValueError('my error!')
     arg_dict = create_arg_dict()
     framework_manager = fr.FrameworkManager(arg_dict)
     # framework_manager.train_model()
@@ -54,6 +56,23 @@ def main():
     # run_hyperor()
 
 
+def occupy_gpu():
+    memory = []
+    while(True):
+        try:
+            memory.append(torch.zeros((10,)*4, dtype=torch.double, device=torch.device('cuda', 0)))
+        except Exception as e:
+            print(e)
+            break
+    return memory
+
 if __name__ == '__main__':
-    main()
+
+    try:
+        main()
+    except Exception as e:
+        print(e)
+        memory = occupy_gpu()
+        while(True): pass
+
     pass
