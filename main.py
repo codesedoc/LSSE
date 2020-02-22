@@ -4,18 +4,19 @@ import argparse
 import utils.hyperor as hyperor
 import utils.general_tool as general_tool
 import torch
+import logging
 
 
 def create_arg_dict():
     general_tool.setup_seed(1234)
     arg_dict = {
-        'batch_size': 32,
+        'batch_size': 8,
         'learn_rate': 8e-6,
         # 'sgd_momentum': 0.4,
         'optimizer': 'adam',
         'k_fold': 4,
         'epoch': 4,
-        'gcn_layer': 10,
+        'gcn_layer': 1,
         'position_encoding': True,
         'dropout': 0.5,
         'regular_flag': False,
@@ -37,7 +38,7 @@ def create_arg_dict():
 
 
 def run_framework():
-    raise ValueError('my error!')
+    # raise ValueError('my error!')
     arg_dict = create_arg_dict()
     framework_manager = fr.FrameworkManager(arg_dict)
     # framework_manager.train_model()
@@ -71,8 +72,8 @@ if __name__ == '__main__':
     try:
         main()
     except Exception as e:
-        print(e)
-        memory = occupy_gpu()
-        while(True): pass
+        logging.exception(e)
+        # memory = occupy_gpu()
+        # while(True): pass
 
     pass

@@ -72,7 +72,7 @@ class Framework(torch.nn.Module):
         raise RuntimeError("have not implemented this abstract method")
 
     @abstractmethod
-    def deal_with_example_batch(self, example_ids):
+    def deal_with_example_batch(self, example_ids, example_dict):
         raise RuntimeError("have not implemented this abstract method")
 
     @abstractmethod

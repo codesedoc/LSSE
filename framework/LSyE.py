@@ -78,7 +78,8 @@ class LSyE(fr.Framework):
         self.semantic_layer = SemanticLayer(self.arg_dict)
         self.fully_connection = FullyConnection(self.arg_dict)
 
-    def deal_with_example_batch(self, examples):
+    def deal_with_example_batch(self, example_ids, example_dict):
+        examples = [example_dict[str(e_id.item())] for e_id in example_ids]
         def get_sentence_input_info(sentences):
             sentence_tokens_batch = []
             adj_matrixs = []
@@ -168,9 +169,7 @@ class LSyE(fr.Framework):
         return regular_part_list, regular_factor_list
 
     def get_input_of_visualize_model(self, example_ids, example_dict):
-        examples = [example_dict[str(e_id)] for e_id in example_ids]
-
-        data_batch = self.deal_with_example_batch(examples)
+        data_batch = self.deal_with_example_batch(example_ids, example_dict)
         sentence_pair_tokens = data_batch['sentence_pair_tokens']
         segment_ids = data_batch['segment_ids']
         sep_index = data_batch['sep_index']

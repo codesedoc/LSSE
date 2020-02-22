@@ -78,7 +78,8 @@ class LSSE(fr.Framework):
         self.semantic_layer = SemanticLayer(self.arg_dict)
         self.fully_connection = FullyConnection(self.arg_dict)
 
-    def deal_with_example_batch(self, examples):
+    def deal_with_example_batch(self, example_ids, example_dict):
+        examples = [example_dict[str(e_id.item())] for e_id in example_ids]
         def get_sentence_input_info(sentences):
             sentence_tokens_batch = []
             adj_matrixs = []
@@ -124,15 +125,17 @@ class LSSE(fr.Framework):
         }
         return result
 
-    def forward(self, example_ids, example_dict):
-        examples = [example_dict[str(e_id.item())] for e_id in example_ids]
+    def forward(self, *input_data, **kwargs):
+        if len(kwargs) == 5:
+            data_batch = kwargs
+            sentence_pair_tokens = data_batch['sentence_pair_tokens_batch']
+            segment_ids = data_batch['segment_ids']
+            sep_index = data_batch['sep_index']
+            adj_matrix1s = data_batch['adj_matrix1s']
+            adj_matrix2s = data_batch['adj_matrix2s']
+        else:
+            sentence_pair_tokens, segment_ids, sep_index, adj_matrix1s, adj_matrix2s = input_data
 
-        data_batch = self.deal_with_example_batch(examples)
-        sentence_pair_tokens = data_batch['sentence_pair_tokens_batch']
-        segment_ids = data_batch['segment_ids']
-        sep_index = data_batch['sep_index']
-        adj_matrix1s = data_batch['adj_matrix1s']
-        adj_matrix2s = data_batch['adj_matrix2s']
         sentence_pair_reps, sentence1_reps, sentence2_reps = self.bert(sentence_pair_tokens, segment_ids, sep_index)
 
         def get_position_es(shape):
@@ -172,9 +175,7 @@ class LSSE(fr.Framework):
         return regular_part_list, regular_factor_list
 
     def get_input_of_visualize_model(self, example_ids, example_dict):
-        examples = [example_dict[str(e_id.item())] for e_id in example_ids]
-
-        data_batch = self.deal_with_example_batch(examples)
+        data_batch = self.deal_with_example_batch(example_ids, example_dict)
         sentence_pair_tokens = data_batch['sentence_pair_tokens_batch']
         segment_ids = data_batch['segment_ids']
         sep_index = torch.tensor(data_batch['sep_index'], device=self.device, dtype= torch.int)
@@ -183,10 +184,7 @@ class LSSE(fr.Framework):
 
         input_data = (sentence_pair_tokens, segment_ids, sep_index, adj_matrix1s, adj_matrix2s)
 
-        visualization_path = file_tool.connect_path(self.framework.result_path, 'visualization')
-        file_tool.makedir(visualization_path)
-        filename = visualization_tool.create_filename(visualization_path)
-        visualization_tool.log_graph(filename=filename, nn_model=self.framework, input_data=input_data, )
+        return input_data
 
 
     def count_of_parameter(self):

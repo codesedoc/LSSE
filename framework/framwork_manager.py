@@ -104,7 +104,8 @@ class FrameworkManager:
             # end_time = time.time()
             # print('time:{}'.format(end_time - start_time))
             # start_time = time.time()
-            model_output = self.framework(example_ids, loader.example_dict)
+            batch_ = self.framework.deal_with_example_batch(example_ids, loader.example_dict)
+            model_output = self.framework(**batch_)
             loss, train_correct_count = self.loser(model_output, labels)
             # end_time = time.time()
             # print('time:{}'.format(end_time-start_time))
@@ -262,7 +263,8 @@ class FrameworkManager:
             # end_time = time.time()
             # print('time:{}'.format(end_time - start_time))
             # start_time = time.time()
-            model_result = self.framework(example_ids, data_loader.example_dict)
+            batch_ = self.framework.deal_with_example_batch(example_ids, data_loader.example_dict)
+            model_result = self.framework(**batch_)
             if len(model_result) != len(labels):
                 raise ValueError
 
@@ -381,7 +383,7 @@ class FrameworkManager:
         train_loader = self.data_manager.train_loader(self.arg_dict['batch_size'])
         batch = iter(train_loader).next()
         example_ids = batch['example_id']
-        input_data = (example_ids, train_loader.example_dict)
+        input_data = self.framework.get_input_of_visualize_model(example_ids, train_loader.example_dict)
         visualization_path = file_tool.connect_path(self.framework.result_path, 'visualization')
         file_tool.makedir(visualization_path)
         filename = visualization_tool.create_filename(visualization_path)
