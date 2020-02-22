@@ -54,6 +54,8 @@ class FrameworkManager:
         self.logger = log_tool.get_logger(self.framework_logger_name,
                                           file_tool.connect_path(self.framework.arg_dict['model_path'], 'log.txt'))
 
+        self.logger.info('{} was created!'.format(self.framework.name))
+
         self.__print_framework_parameter__()
         self.__print_framework_arg_dict__()
 
@@ -68,7 +70,6 @@ class FrameworkManager:
 
     def create_framework(self):
         self.framework = self.get_framework()
-        self.framework.create_models()
 
         gpu_id = self.arg_dict['ues_gpu']
         if gpu_id == -1:
@@ -86,11 +87,11 @@ class FrameworkManager:
             raise ValueError
 
     def get_framework(self):
-        if self.arg_dict['framework_name'] == "LSSE":
-            arg_dict = self.arg_dict.copy()
-            arg_dict['max_sentence_length'] = self.data_manager.get_max_sent_len()
-            arg_dict['dep_kind_count'] = self.data_manager.get_max_dep_type()
-            return fr.LSSEFramework(arg_dict)
+        arg_dict = self.arg_dict.copy()
+        arg_dict['max_sentence_length'] = self.data_manager.get_max_sent_len()
+        arg_dict['dep_kind_count'] = self.data_manager.get_max_dep_type()
+        frame_work = fr.frameworks[self.arg_dict['framework_name']]
+        return frame_work(arg_dict)
 
     def __train_epoch__(self, epoch, loader):
         loss_avg = 0
@@ -225,6 +226,7 @@ class FrameworkManager:
         for tuple_index, train_loader_tuple in enumerate(train_loader_tuple_list, 1):
             #repeat create framework, when each fold train
             self.create_framework()
+            self.logger.info('{} was created!'.format(self.framework.name))
             train_loader, valid_loader = train_loader_tuple
             self.logger.info('train_loader:{}  valid_loader:{}'.format(len(train_loader), len(valid_loader)))
             self.logger.info('begin train {}-th fold'.format(tuple_index))
@@ -379,8 +381,10 @@ class FrameworkManager:
         train_loader = self.data_manager.train_loader(self.arg_dict['batch_size'])
         batch = iter(train_loader).next()
         example_ids = batch['example_id']
-        input_data = self.framework.get_input_of_visualize_model(example_ids, train_loader.example_dict)
-        filename = visualization_tool.create_log_filename()
+        input_data = (example_ids, train_loader.example_dict)
+        visualization_path = file_tool.connect_path(self.framework.result_path, 'visualization')
+        file_tool.makedir(visualization_path)
+        filename = visualization_tool.create_filename(visualization_path)
         visualization_tool.log_graph(filename=filename, nn_model=self.framework, input_data=input_data, )
 
     def save_model(self, cpu=False):

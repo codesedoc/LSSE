@@ -6,8 +6,8 @@ import time
 
 
 def log_graph(filename,  nn_model, input_data, comment =None,):
-    with SummaryWriter(filename,comment=comment) as w:
-        w.add_graph(nn_model,input_data)
+    with SummaryWriter(filename, comment=comment) as w:
+        w.add_graph(nn_model, input_data)
 
 
 def run_tensorboard_command():
@@ -15,8 +15,9 @@ def run_tensorboard_command():
     os.system(command)
 
 
-def create_log_filename(filename=None):
-    if filename is None:
-        filename = time.strftime("%Y_%m_%d %H_%M_%S", time.localtime())
-        filename = os.path.join(file_tool.PathManager.tensorboard_runs_path,filename)
+def create_filename(path):
+
+    filename = time.strftime("%Y_%m_%d %H_%M_%S", time.localtime())
+    filename = os.path.join(path, filename)
+
     return filename

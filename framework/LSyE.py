@@ -10,13 +10,13 @@ import utils.data_tool as data_tool
 from model import *
 
 
-class LSSE(fr.Framework):
-    name = "LSSE"
+class LSyE(fr.Framework):
+    name = "LSyE"
 
     def __init__(self, arg_dict):
-        self.name = LSSE.name
-        self.result_path = file_tool.connect_path('result', LSSE.name)
         super().__init__(arg_dict)
+        self.name = LSyE.name
+        self.result_path = file_tool.connect_path('result', LSyE.name)
 
     @classmethod
     def framework_name(cls):
@@ -27,7 +27,7 @@ class LSSE(fr.Framework):
             # 'sgd_momentum': 0.4,
             'semantic_compare_func': 'l2',
             'concatenate_input_for_gcn_hidden': True,
-            'fully_scales': [768 * 2, 150, 1],
+            'fully_scales': [768, 150, 1],
             'position_encoding': True,
             'fully_regular': 1e-4,
             'gcn_regular': 1e-4,
@@ -35,13 +35,13 @@ class LSSE(fr.Framework):
             'gcn_layer': 2,
             'group_layer_limit_flag': False,
             'group_layer_limit_list': [2, 3, 4, 5, 6],
-
             'gcn_gate_flag': True,
             'gcn_norm_item': 0.5,
             'gcn_self_loop_flag': True,
             'gcn_hidden_dim': 768,
             'bert_hidden_dim': 768,
             'dtype': torch.float32,
+            'model_path': "result/LSyE",
         }
         return arg_dict
 
@@ -133,7 +133,7 @@ class LSSE(fr.Framework):
         sep_index = data_batch['sep_index']
         adj_matrix1s = data_batch['adj_matrix1s']
         adj_matrix2s = data_batch['adj_matrix2s']
-        sentence_pair_reps, sentence1_reps, sentence2_reps = self.bert(sentence_pair_tokens, segment_ids, sep_index)
+        _, sentence1_reps, sentence2_reps = self.bert(sentence_pair_tokens, segment_ids, sep_index)
 
         def get_position_es(shape):
             position_encodings = general_tool.get_global_position_encodings(length=self.arg_dict['max_sentence_length'],
@@ -158,13 +158,9 @@ class LSSE(fr.Framework):
             gcn_out1 = torch.cat([gcn_out1, sentence1_reps], dim=2)
             gcn_out2 = torch.cat([gcn_out2, sentence2_reps], dim=2)
         result = self.semantic_layer(gcn_out1, gcn_out2)
-        result = torch.cat([sentence_pair_reps, result], dim=1)
 
         result = self.fully_connection(result)
         return result
-
-    # def run_batch(self, batch):
-    #     raise RuntimeError("have not implemented this abstract method")
 
     def get_regular_parts(self):
         regular_part_list = (self.gcn, self.fully_connection, self.bert)
@@ -172,22 +168,16 @@ class LSSE(fr.Framework):
         return regular_part_list, regular_factor_list
 
     def get_input_of_visualize_model(self, example_ids, example_dict):
-        examples = [example_dict[str(e_id.item())] for e_id in example_ids]
+        examples = [example_dict[str(e_id)] for e_id in example_ids]
 
         data_batch = self.deal_with_example_batch(examples)
-        sentence_pair_tokens = data_batch['sentence_pair_tokens_batch']
+        sentence_pair_tokens = data_batch['sentence_pair_tokens']
         segment_ids = data_batch['segment_ids']
-        sep_index = torch.tensor(data_batch['sep_index'], device=self.device, dtype= torch.int)
+        sep_index = data_batch['sep_index']
         adj_matrix1s = data_batch['adj_matrix1s']
         adj_matrix2s = data_batch['adj_matrix2s']
 
-        input_data = (sentence_pair_tokens, segment_ids, sep_index, adj_matrix1s, adj_matrix2s)
-
-        visualization_path = file_tool.connect_path(self.framework.result_path, 'visualization')
-        file_tool.makedir(visualization_path)
-        filename = visualization_tool.create_filename(visualization_path)
-        visualization_tool.log_graph(filename=filename, nn_model=self.framework, input_data=input_data, )
-
+        return sentence_pair_tokens, segment_ids, sep_index, adj_matrix1s, adj_matrix2s
 
     def count_of_parameter(self):
         with torch.no_grad():

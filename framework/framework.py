@@ -49,6 +49,7 @@ class Framework(torch.nn.Module):
             self.device = torch.device('cpu')
         else:
             self.device = torch.device('cuda', gpu_id)
+        self.create_models()
 
     def update_arg_dict(self, arg_dict):
         for name in arg_dict:
@@ -68,7 +69,6 @@ class Framework(torch.nn.Module):
 
     @abstractmethod
     def create_models(self):
-
         raise RuntimeError("have not implemented this abstract method")
 
     @abstractmethod
@@ -85,5 +85,9 @@ class Framework(torch.nn.Module):
 
     @abstractmethod
     def count_of_parameter(self):
+        raise RuntimeError("have not implemented this abstract method")
+
+    @classmethod
+    def framework_name(cls):
         raise RuntimeError("have not implemented this abstract method")
 
