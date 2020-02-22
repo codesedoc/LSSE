@@ -36,10 +36,10 @@ class SeE(fr.LSeE):
 
     def create_models(self):
         self.bert = ALBertBase()
-        self.fully_connection = FullyConnection(self.arg_dict)
+        self.fully_connection = BertFineTuneConnection(self.arg_dict)
 
     def update_arg_dict(self, arg_dict):
-        super().update_arg_dict(arg_dict)
+        self.arg_dict.update(arg_dict)
 
         if self.arg_dict['repeat_train']:
             time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))

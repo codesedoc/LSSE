@@ -23,7 +23,7 @@ def create_arg_dict():
         'ues_gpu': 0,
         'repeat_train': True,
         'corpus': corpus.mrpc.get_mrpc_obj,
-        'framework_name': "LE",
+        'framework_name': "SeE",
 
     }
     parser = argparse.ArgumentParser(description='PIRs')

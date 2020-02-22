@@ -30,3 +30,23 @@ class FullyConnection(torch.nn.Module):
             result = active(result)
 
         return result
+
+
+class BertFineTuneConnection(torch.nn.Module):
+    def __init__(self, arg_dict):
+        super().__init__()
+        bert_hidden_dim = arg_dict['bert_hidden_dim']
+        self.linear = torch.nn.Linear(bert_hidden_dim, 2, bias=True)
+        self.activity = torch.nn.Softmax(dim=1)
+
+    def forward(self, input_data):
+        # input_data = input_data.permute(1, 0, 2)
+        result = input_data
+        if torch.isnan(result).sum() > 0:
+            print(torch.isnan(result))
+            raise ValueError
+        result = self.linear(result)
+        result = self.activity(result)
+        result = result[:, 0]
+        result = result.reshape(-1)
+        return result
