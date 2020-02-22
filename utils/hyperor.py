@@ -12,12 +12,13 @@ class Hyperor:
     def __init__(self, arg_dict):
         super().__init__()
         self.arg_dict = arg_dict
+        self.start_up_trials = 5
         self.study_path = file_tool.connect_path("result", self.arg_dict['framework_name'], 'optuna')
         file_tool.makedir(self.study_path)
         self.study = optuna.create_study(study_name=self.arg_dict['framework_name'],
                                          storage='sqlite:///' + file_tool.connect_path(self.study_path, 'study_hyper_parameter.db'),
                                          load_if_exists=True,
-                                         pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=10))
+                                         pruner=optuna.pruners.MedianPruner(n_startup_trials=self.start_up_trials, n_warmup_steps=10))
 
         logger_filename = file_tool.connect_path(self.study_path, 'log.txt')
         self.logger = log_tool.get_logger('my_optuna', logger_filename, log_format=logging.Formatter("%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
@@ -34,6 +35,7 @@ class Hyperor:
             'epoch': 50,
             'repeat_train': True,
             'ues_gpu': 0,
+            'start_up_trials': self.start_up_trials
         }
 
         self.arg_dict.update(arg_dict)
