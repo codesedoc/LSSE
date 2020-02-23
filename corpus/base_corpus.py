@@ -22,6 +22,9 @@ class Sentence:
     def word_tokens(self):
         return self.parse_info['words'].copy()
 
+    def original_sentence(self):
+        return self.original
+
     def numeral_dependencies(self):
         return self.syntax_info['dependencies'].copy()
 

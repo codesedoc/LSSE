@@ -6,9 +6,28 @@ import utils.log_tool as log_tool
 import utils.visualization_tool as visualization_tool
 import framework as fr
 import numpy as np
-# import utils.SimpleProgressBar as progress_bar
+from torch.optim.lr_scheduler import LambdaLR
+import utils.SimpleProgressBar as progress_bar
 # import time
 
+# self.scheduler = get_linear_schedule_with_warmup(
+#             self.optimizer, num_warmup_steps=self.arg_dict["warmup_steps"],
+#             num_training_steps=int(len(train_loader) * self.arg_dict['epoch'])
+#         )
+
+def get_linear_schedule_with_warmup(optimizer, num_warmup_steps, num_training_steps, last_epoch=-1):
+    """ Create a schedule with a learning rate that decreases linearly after
+    linearly increasing during a warmup period.
+    """
+
+    def lr_lambda(current_step):
+        if current_step < num_warmup_steps:
+            return float(current_step) / float(max(1, num_warmup_steps))
+        return max(
+            0.0, float(num_training_steps - current_step) / float(max(1, num_training_steps - num_warmup_steps))
+        )
+
+    return LambdaLR(optimizer, lr_lambda, last_epoch)
 
 class FrameworkManager:
     def __init__(self, arg_dict, trial=None):
@@ -29,35 +48,14 @@ class FrameworkManager:
 
         self.framework = None
         self.optimizer = None
-        self.create_framework()
-        self.loser = fr.BiCELo(self.arg_dict, *self.framework.get_regular_parts())
         self.framework_logger_name = 'framework_logger'
         if trial is not None:
             self.trial = trial
             self.trial_step = 0
             self.framework_logger_name += str(trial.number)
+        # self.create_framework()
 
-        checkpoint_path = file_tool.connect_path(self.framework.arg_dict['model_path'], 'checkpoint')
-        file_tool.makedir(checkpoint_path)
 
-        self.entire_model_state_dict_file = file_tool.connect_path(checkpoint_path, 'entire_model.pt')
-        self.optimizer_state_dict_file = file_tool.connect_path(checkpoint_path, 'optimizer.pt')
-
-        if not arg_dict['repeat_train']:
-            if gpu_id == -1:
-                self.framework.load_state_dict(torch.load(file_tool.PathManager.change_filename_by_append
-                                                          (self.entire_model_state_dict_file, 'cpu')))
-            else:
-                self.framework.load_state_dict(torch.load(self.entire_model_state_dict_file))
-            self.optimizer.load_state_dict(torch.load(self.optimizer_state_dict_file))
-
-        self.logger = log_tool.get_logger(self.framework_logger_name,
-                                          file_tool.connect_path(self.framework.arg_dict['model_path'], 'log.txt'))
-
-        self.logger.info('{} was created!'.format(self.framework.name))
-
-        self.__print_framework_parameter__()
-        self.__print_framework_arg_dict__()
 
     def __print_framework_parameter__(self):
         framework_parameter_count_dict = self.framework.count_of_parameter()
@@ -86,6 +84,31 @@ class FrameworkManager:
         else:
             raise ValueError
 
+        self.loser = fr.BiCELo(self.arg_dict, *self.framework.get_regular_parts())
+
+        checkpoint_path = file_tool.connect_path(self.framework.arg_dict['model_path'], 'checkpoint')
+        file_tool.makedir(checkpoint_path)
+
+        self.entire_model_state_dict_file = file_tool.connect_path(checkpoint_path, 'entire_model.pt')
+        self.optimizer_state_dict_file = file_tool.connect_path(checkpoint_path, 'optimizer.pt')
+
+        if not self.arg_dict['repeat_train']:
+            if gpu_id == -1:
+                self.framework.load_state_dict(torch.load(file_tool.PathManager.change_filename_by_append
+                                                          (self.entire_model_state_dict_file, 'cpu')))
+            else:
+                self.framework.load_state_dict(torch.load(self.entire_model_state_dict_file))
+            self.optimizer.load_state_dict(torch.load(self.optimizer_state_dict_file))
+
+        self.logger = log_tool.get_logger(self.framework_logger_name,
+                                          file_tool.connect_path(self.framework.arg_dict['model_path'], 'log.txt'))
+
+        self.logger.info('{} was created!'.format(self.framework.name))
+
+        self.__print_framework_parameter__()
+        self.__print_framework_arg_dict__()
+
+
     def get_framework(self):
         arg_dict = self.arg_dict.copy()
         arg_dict['max_sentence_length'] = self.data_manager.get_max_sent_len()
@@ -97,6 +120,7 @@ class FrameworkManager:
         loss_avg = 0
         train_accuracy_avg = 0
         train_example_count = 0
+        global_progress_bar = progress_bar.SimpleProgressBar()
         for b, batch in enumerate(loader):
             example_ids = batch['example_id']
             labels = batch['label'].to(device=self.device, dtype=self.framework.data_type)
@@ -115,13 +139,15 @@ class FrameworkManager:
             # print('time:{}'.format(end_time - start_time))
             # loss = float(loss)
             self.optimizer.step()
+            if hasattr(self, 'scheduler'):
+                self.scheduler.step()
             loss_avg += float(loss)
             train_accuracy_avg += train_correct_count
             train_example_count += len(labels)
-            # print('epoch:{}  batch:{}  arg_loss:{}'.format(epoch + 1, b + 1, loss))
+            # print('epoch:{:5}  batch:{:5}  arg_loss:{:20}'.format(epoch + 1, b + 1, loss), end='\r')
             # end_time = time.time()
             # print('time:{}'.format(end_time-start_time))
-            # global_progress_bar.update((b+1)*100/len(train_loader))
+            global_progress_bar.update((b+1)*100/len(loader))
         # print()
         loss_avg = loss_avg / len(loader)
         train_accuracy_avg = train_accuracy_avg / train_example_count
@@ -144,6 +170,8 @@ class FrameworkManager:
                 train_accuracy_avg, loss_avg = self.__train_epoch__(epoch, train_loader)
                 self.logger.info(
                     'epoch:{} train_accuracy:{}  arg_loss:{}'.format(epoch + 1, train_accuracy_avg, loss_avg))
+
+                self.logger.info("learning_rate".format(self.scheduler.get_lr()[0]))
 
                 with torch.no_grad():
                     evaluation_result = self.evaluation_calculation(valid_loader)
@@ -220,16 +248,23 @@ class FrameworkManager:
         self.logger.info('\n')
 
     def train_model(self):
-        self.logger.info('begin to train model')
         train_loader_tuple_list = self.data_loader_dict['train_loader_tuple_list']
         avg_result = np.array([0, 0], dtype=np.float)
         record_list = []
         for tuple_index, train_loader_tuple in enumerate(train_loader_tuple_list, 1):
+            # if tuple_index>2:
+            #     break
             #repeat create framework, when each fold train
             self.create_framework()
             self.logger.info('{} was created!'.format(self.framework.name))
             train_loader, valid_loader = train_loader_tuple
             self.logger.info('train_loader:{}  valid_loader:{}'.format(len(train_loader), len(valid_loader)))
+
+            self.scheduler = get_linear_schedule_with_warmup(
+                self.optimizer, num_warmup_steps=self.arg_dict["warmup_steps"],
+                num_training_steps=int(len(train_loader) * self.arg_dict['epoch'])
+            )
+
             self.logger.info('begin train {}-th fold'.format(tuple_index))
 
             result = self.__train_fold__(train_loader=train_loader, valid_loader=valid_loader)
@@ -324,9 +359,16 @@ class FrameworkManager:
         return result
 
     def train_final_model(self):
-        self.framework.print_arg_dict()
+        # self.framework.print_arg_dict()
+        self.create_framework()
         self.logger.info('begin to train final model')
         train_loader = self.data_manager.train_loader(self.arg_dict['batch_size'])
+        # train_loader, _ = self.data_loader_dict['train_loader_tuple_list'][1]
+        self.scheduler = get_linear_schedule_with_warmup(
+            self.optimizer, num_warmup_steps=self.arg_dict["warmup_steps"],
+            num_training_steps=int(len(train_loader) * self.arg_dict['epoch'])
+        )
+        self.logger.info("train_loader:{}".format(len(train_loader)))
         train_accuracy_list = []
         loss_list = []
         for epoch in range(self.arg_dict['epoch']):

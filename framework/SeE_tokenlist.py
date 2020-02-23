@@ -51,7 +51,7 @@ class SeE(fr.LSeE):
         sentence2s = [e.sentence2 for e in examples]
         sentence_pair_tokens_batch = []
         for s1, s2 in zip(sentence1s, sentence2s):
-            inputs = self.bert.tokenizer.encode_plus(s1.original_sentence(), s2.original_sentence(), add_special_tokens=True,
+            inputs = self.bert.tokenizer.encode_plus(s1.word_tokens(), s2.word_tokens(), add_special_tokens=True,
                                            max_length=sentence_max_len, )
 
             input_ids, token_type_ids = inputs["input_ids"], inputs["token_type_ids"]
