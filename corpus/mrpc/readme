@@ -1,2 +1,2 @@
-original_sentence_dict is the modified version
-parsed_sentence have "ROOT" head
+original_sentence_dict_modify.pkl is the modified version
+parsed_sentence_dict_old.pkl have "ROOT" head, split by stanford parser

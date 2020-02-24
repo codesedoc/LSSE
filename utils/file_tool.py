@@ -6,8 +6,8 @@ def get_absolute_path(file):
     return os.path.dirname(file)
 
 
-def load_data(file_name, model):
-    with open(file_name, model) as f:
+def load_data(file_name, mode):
+    with open(file_name, mode) as f:
         rows = f.readlines()
     return rows
 
@@ -52,6 +52,10 @@ def makedir(path):
 
 def check_dir(path):
     return os.path.exists(path)
+
+
+def check_file(filename):
+    return os.path.exists(filename)
 
 
 class FileOperator:

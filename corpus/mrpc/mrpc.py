@@ -6,14 +6,41 @@ import utils.general_tool as general_tool
 
 single_mrpc_obj = None
 
+
 class Mrpc(base_corpus.Corpus):
+    data_path = 'corpus/mrpc'
+
+    def __extra_examples_from_org_file__(self, org_file, des_filename):
+        if file_tool.check_file(des_filename):
+            examples_dicts = file_tool.load_data_pickle(des_filename)
+            return examples_dicts
+        example_dicts = []
+        rows = file_tool.load_data(org_file, mode='r')
+        examples_id = 0
+        for i, row in enumerate(rows):
+            result = row.split("\t")
+            if i == 0:
+                continue
+            if len(result) != 5:
+                raise RuntimeError
+            example_temp = {
+                'sent_id1': int(result[1]),
+                'sent_id2': int(result[2]),
+                'label': int(result[0]),
+                'id': examples_id
+            }
+            example_dicts.append(example_temp)
+            examples_id += 1
+        file_tool.save_data_pickle(example_dicts, des_filename)
+        return example_dicts
+
     def create_examples(self):
         def create_examples_by_dicts(examples):
             example_obj_list = []
             example_obj_dict = {}
             for e in examples:
-                sentence1_id = str(e['data'][0])
-                sentence2_id = str(e['data'][1])
+                sentence1_id = str(e['sent_id1'])
+                sentence2_id = str(e['sent_id2'])
                 sentence1 = self.sentence_dict[sentence1_id]
                 sentence2 = self.sentence_dict[sentence2_id]
 
@@ -27,15 +54,49 @@ class Mrpc(base_corpus.Corpus):
                 example_obj_dict[id_] = example_obj
             return example_obj_list, example_obj_dict
 
-        train_examples = file_tool.load_data_pickle('corpus/mrpc/train_examples.pkl')
-        self.train_example_list,self.train_example_dict  = create_examples_by_dicts(train_examples)
+        train_dicts = self.__extra_examples_from_org_file__(
+                                file_tool.connect_path(self.data_path, 'train.txt'),
+                                file_tool.connect_path(self.data_path, 'train_dicts.pkl'))
 
-        test_examples = file_tool.load_data_pickle('corpus/mrpc/test_examples.pkl')
-        self.test_example_list, self.test_example_dict = create_examples_by_dicts(test_examples)
+        test_dicts = self.__extra_examples_from_org_file__(
+                                file_tool.connect_path(self.data_path, 'test.txt'),
+                                file_tool.connect_path(self.data_path, 'test_dicts.pkl'))
+
+        self.train_example_list, self.train_example_dict = create_examples_by_dicts(train_dicts)
+
+        self.test_example_list, self.test_example_dict = create_examples_by_dicts(test_dicts)
+
         pass
 
+    def __extra_sentences_from_org_file__(self, org_file, des_filename):
+        if file_tool.check_file(des_filename):
+            sentence_dict = file_tool.load_data_pickle(des_filename)
+            return sentence_dict
+        sentence_dict = {}
+        rows = file_tool.load_data(org_file, mode='r')
+        for i, row in enumerate(rows):
+            result = row.split("\t")
+            if i == 0:
+                continue
+            if len(result) != 7:
+                raise RuntimeError
+
+            if not general_tool.is_number(result[0]):
+                raise RuntimeError
+
+            if str(result[0]) in sentence_dict:
+                raise RuntimeError
+
+            sentence_dict[str(result[0])] = str(result[1])
+
+        file_tool.save_data_pickle(sentence_dict, des_filename)
+
+        return sentence_dict
+
     def create_sentences(self):
-        original_sentence_dict = file_tool.load_data_pickle('corpus/mrpc/original_sentence_dict.pkl')
+        original_sentence_dict = self.__extra_sentences_from_org_file__(
+                                file_tool.connect_path(self.data_path, 'data.txt'),
+                                file_tool.connect_path(self.data_path, 'original_sentence_dict.pkl'))
         self.sentence_list = []
         self.sentence_dict = {}
         for sent_id, o_sent in original_sentence_dict.items():

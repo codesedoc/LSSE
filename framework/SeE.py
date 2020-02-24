@@ -49,6 +49,8 @@ class SeE(fr.LSeE):
 
         sentence1s = [e.sentence1 for e in examples]
         sentence2s = [e.sentence2 for e in examples]
+        labels = [e.label for e in examples]
+
         sentence_pair_tokens_batch = []
         for s1, s2 in zip(sentence1s, sentence2s):
             inputs = self.bert.tokenizer.encode_plus(s1.original_sentence(), s2.original_sentence(), add_special_tokens=True,
@@ -74,6 +76,7 @@ class SeE(fr.LSeE):
                 'input_ids': input_ids,
                 'token_type_ids': token_type_ids,
                 'attention_mask': attention_mask,
+                'labels': labels
             }
             sentence_pair_tokens_batch.append(inputs)
         # sentence_pair_tokens_batch = torch.tensor([self.bert.tokenizer.encode(s1, s2, add_special_tokens=True)
