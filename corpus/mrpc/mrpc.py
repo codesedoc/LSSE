@@ -109,12 +109,23 @@ class Mrpc(base_corpus.Corpus):
         pass
 
     def parse_sentences(self):
-        parsed_sentence_dict = file_tool.load_data_pickle('corpus/mrpc/parsed_sentence_dict.pkl')
+        parsed_sentence_org_file = 'corpus/mrpc/parsed_sentences.txt'
+        parsed_sentence_dict_file = 'corpus/mrpc/parsed_sentence_dict.pkl'
+        if file_tool.check_file(parsed_sentence_dict_file):
+            parsed_sentence_dict = file_tool.load_data_pickle(parsed_sentence_dict_file)
+        else:
+            parsed_sentence_dict = parser_tool.extra_parsed_sentence_dict_from_org_file(parsed_sentence_org_file)
+            file_tool.save_data_pickle(parsed_sentence_dict, parsed_sentence_dict_file)
+
         if len(parsed_sentence_dict) != len(self.sentence_dict):
             raise ValueError("parsed_sentence_dict not march sentence_dict")
 
         if not general_tool.compare_two_dict_keys(self.sentence_dict.copy(), parsed_sentence_dict.copy()):
             raise ValueError("parsed_sentence_dict not march sentence_dict")
+
+        # for sent_id, info in parsed_sentence_dict.items():
+        #     if info['original'] != self.sentence_dict[sent_id].original:
+        #         raise ValueError("parsed_sentence_dict not march sentence_dict")
 
         for sent_id, parse_info in parsed_sentence_dict.items():
             sent_id = str(sent_id)

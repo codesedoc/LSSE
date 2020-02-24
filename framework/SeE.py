@@ -56,18 +56,23 @@ class SeE(fr.LSeE):
             # inputs = self.bert.tokenizer.encode_plus("Who was Jim Henson ?", "Jim Henson was a puppeteer", add_special_tokens=True,
             #                                max_length=sentence_max_len, )
 
-            inputs_ls = self.bert.tokenizer.encode_plus(s1.word_tokens_uncased()[1:], s2.word_tokens_uncased()[1:],
+            inputs_ls = self.bert.tokenizer.encode_plus(s1.original_sentence(), s2.original_sentence(),
                                                      add_special_tokens=True,
                                                      max_length=sentence_max_len, )
+
+
+
+            # inputs_ls_cased = self.bert.tokenizer_cased.encode_plus(s1.word_tokens(), s2.word_tokens(),
+            #                                                       add_special_tokens=True,
+            #                                                       max_length=sentence_max_len, )
+            # input_ids, token_type_ids = inputs_ls_cased["input_ids"], inputs_ls_cased["token_type_ids"]
 
             # input_ids, token_type_ids = inputs["input_ids"], inputs["token_type_ids"]
             input_ids, token_type_ids = inputs_ls["input_ids"], inputs_ls["token_type_ids"]
             # input_ids_cased = self.bert.tokenizer_cased.encode("Who was Jim Henson ?", "Jim Henson was a puppeteer", add_special_tokens=True,
             #                                max_length=sentence_max_len, )
             #
-            # input_ids_ls_cased = self.bert.tokenizer_cased.encode(s1.word_tokens(), s2.word_tokens(),
-            #                                                    add_special_tokens=True,
-            #                                                    max_length=sentence_max_len, )
+
 
             attention_mask = [1 if mask_padding_with_zero else 0] * len(input_ids)
 

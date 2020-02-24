@@ -1,5 +1,6 @@
 import utils.number_tool as number_tool
 import numpy as np
+import utils.file_tool as file_tool
 
 
 class ParseInfo:
@@ -16,6 +17,64 @@ class ParseInfo:
             if len(tokens)>max_sent_len:
                 max_sent_len = len(tokens)
         self.max_sent_len = max_sent_len
+
+
+def extra_parsed_sentence_dict_from_org_file(org_file):
+    rows = file_tool.load_data(org_file, 'r')
+    parsed_sentence_dict = {}
+    for row in rows:
+        items = row.strip().split('[Sq]')
+        if len(items) != 4:
+            raise ValueError("file format error")
+        sent_id = str(items[0].strip())
+        org_sent = str(items[1].strip())
+        sent_tokens = str(items[2].strip()).split(' ')
+
+        dependencies = []
+        dep_strs = str(items[3].strip()).split('[De]')
+        for dep_str in dep_strs:
+            def extra_word_index(wi_str):
+                wi_str_temp = wi_str.split('-')
+                word = ''.join(wi_str_temp[:-1])
+                index = str(wi_str_temp[-1])
+                return word, index
+
+            dep_itmes = dep_str.strip().split('[|]')
+            if len(dep_itmes) != 3:
+                raise ValueError("file format error")
+            dep_name = str(dep_itmes[0]).strip()
+            first_word, first_index = extra_word_index(str(dep_itmes[1]).strip())
+            second_word, second_index = extra_word_index(str(dep_itmes[2]).strip())
+
+            word_pair = {
+                "first": {"word": first_word, "index": first_index},
+                "second": {"word": second_word, "index": second_index}
+            }
+
+            dependency_dict = {
+                'name': dep_name,
+                'word_pair': word_pair
+            }
+            dependencies.append(dependency_dict)
+
+        for w in sent_tokens:
+            if w == '' or len(w) == 0:
+                raise ValueError("file format error")
+
+        parsed_info_dict = {
+            'original': org_sent,
+            'words': sent_tokens,
+            'dependencies': dependencies,
+            'id': sent_id,
+            'has_root': True
+        }
+        if sent_id in parsed_sentence_dict:
+            raise ValueError("file format error")
+
+        parsed_sentence_dict[sent_id] = parsed_info_dict
+
+    return parsed_sentence_dict
+
 
 
 def modify_dependency_name(parsing_sentence_dict):

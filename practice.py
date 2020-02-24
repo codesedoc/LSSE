@@ -15,8 +15,10 @@ for i, _ in enumerate(str2):
 
 print(str1, str2)
 
-s1 = "faeRF"
-s2 = s1.lower()
+s1 = "xsfaeRFxs"
+s2 = 'XXX'
 
 print(id(s1), id(s2))
 print(s1, s2)
+print(s1.strip()+s2)
+print(s1.strip('xs')+s2)

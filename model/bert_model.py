@@ -7,11 +7,12 @@ class BertBase(torch.nn.Module):
         self.bert = torch.hub.load('huggingface/pytorch-transformers', 'model', 'bert-base-uncased')
         self.tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-uncased')
         self.tokenizer_cased = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
+        self.bert_cased = torch.hub.load('huggingface/pytorch-transformers', 'model', 'bert-base-cased')
         self.config = torch.hub.load('huggingface/pytorch-transformers', 'config', 'bert-base-uncased')
         self.dropout = torch.nn.Dropout(self.config.hidden_dropout_prob)
 
     def forward(self, input_ids_batch, token_type_ids_batch, attention_mask_batch):
-        last_hidden_states, pooler_output = self.bert( input_ids_batch, attention_mask=attention_mask_batch, token_type_ids=token_type_ids_batch)
+        last_hidden_states, pooler_output = self.bert(input_ids_batch, attention_mask=attention_mask_batch, token_type_ids=token_type_ids_batch)
 
         if torch.isnan(last_hidden_states).sum() > 0:
             print(torch.isnan(last_hidden_states))
