@@ -6,6 +6,7 @@ class BertBase(torch.nn.Module):
         super().__init__()
         self.bert = torch.hub.load('huggingface/pytorch-transformers', 'model', 'bert-base-uncased')
         self.tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-uncased')
+        self.tokenizer_cased = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
         self.config = torch.hub.load('huggingface/pytorch-transformers', 'config', 'bert-base-uncased')
         self.dropout = torch.nn.Dropout(self.config.hidden_dropout_prob)
 

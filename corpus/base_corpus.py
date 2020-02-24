@@ -22,6 +22,12 @@ class Sentence:
     def word_tokens(self):
         return self.parse_info['words'].copy()
 
+    def word_tokens_uncased(self):
+        result = self.parse_info['words'].copy()
+        for i, _ in enumerate(result):
+            result[i] = result[i].lower()
+        return result
+
     def original_sentence(self):
         return self.original
 

@@ -53,13 +53,22 @@ class SeE(fr.LSeE):
 
         sentence_pair_tokens_batch = []
         for s1, s2 in zip(sentence1s, sentence2s):
-            inputs = self.bert.tokenizer.encode_plus(s1.original_sentence(), s2.original_sentence(), add_special_tokens=True,
-                                           max_length=sentence_max_len, )
+            # inputs = self.bert.tokenizer.encode_plus("Who was Jim Henson ?", "Jim Henson was a puppeteer", add_special_tokens=True,
+            #                                max_length=sentence_max_len, )
 
-            input_ids, token_type_ids = inputs["input_ids"], inputs["token_type_ids"]
+            inputs_ls = self.bert.tokenizer.encode_plus(s1.word_tokens_uncased()[1:], s2.word_tokens_uncased()[1:],
+                                                     add_special_tokens=True,
+                                                     max_length=sentence_max_len, )
 
-            # The mask has 1 for real tokens and 0 for padding tokens. Only real
-            # tokens are attended to.
+            # input_ids, token_type_ids = inputs["input_ids"], inputs["token_type_ids"]
+            input_ids, token_type_ids = inputs_ls["input_ids"], inputs_ls["token_type_ids"]
+            # input_ids_cased = self.bert.tokenizer_cased.encode("Who was Jim Henson ?", "Jim Henson was a puppeteer", add_special_tokens=True,
+            #                                max_length=sentence_max_len, )
+            #
+            # input_ids_ls_cased = self.bert.tokenizer_cased.encode(s1.word_tokens(), s2.word_tokens(),
+            #                                                    add_special_tokens=True,
+            #                                                    max_length=sentence_max_len, )
+
             attention_mask = [1 if mask_padding_with_zero else 0] * len(input_ids)
 
             padding_length = sentence_max_len - len(input_ids)
@@ -79,14 +88,6 @@ class SeE(fr.LSeE):
                 'labels': labels
             }
             sentence_pair_tokens_batch.append(inputs)
-        # sentence_pair_tokens_batch = torch.tensor([self.bert.tokenizer.encode(s1, s2, add_special_tokens=True)
-        #                                           for s1, s2 in zip(sentence_tokens_batch1, sentence_tokens_batch2)],
-        #                                           device=self.device)
-
-        # segment_ids = torch.cat([torch.zeros(sent_max_len1 + 2), torch.ones(sent_max_len2 + 1)]).to(
-        #     device=self.device, dtype=torch.long)
-        # sep_index = sent_max_len1 + 1
-
         result = {
             'sentence_pair_tokens_batch': sentence_pair_tokens_batch,
         }
