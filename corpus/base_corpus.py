@@ -31,6 +31,9 @@ class Sentence:
     def original_sentence(self):
         return self.original
 
+    def original_sentence_uncased(self):
+        return self.original.lower()
+
     def numeral_dependencies(self):
         return self.syntax_info['dependencies'].copy()
 
