@@ -37,7 +37,6 @@ class BertFineTuneConnection(torch.nn.Module):
         super().__init__()
         bert_hidden_dim = arg_dict['bert_hidden_dim']
         self.linear = torch.nn.Linear(bert_hidden_dim, 2, bias=True)
-        self.activity = torch.nn.Softmax(dim=1)
 
     def forward(self, input_data):
         # input_data = input_data.permute(1, 0, 2)

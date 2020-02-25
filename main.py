@@ -8,7 +8,7 @@ import logging
 
 
 def create_arg_dict():
-    general_tool.setup_seed(1234)
+
     arg_dict = {
         'batch_size': 8,
         'learn_rate': 2e-5,
@@ -17,6 +17,7 @@ def create_arg_dict():
         'k_fold': 10,
         'epoch': 3,
         'warmup_steps': 0,
+        'max_steps': -1,
         # 'gcn_layer': 1,
         # 'position_encoding': True,
         # 'dropout': 0.5,
@@ -25,8 +26,10 @@ def create_arg_dict():
         'repeat_train': True,
         'corpus': corpus.mrpc.get_mrpc_obj,
         'framework_name': "SeE",
-
+        'task_type': 'classification',
+        'seed': 1234
     }
+    general_tool.setup_seed(arg_dict['seed'])
     parser = argparse.ArgumentParser(description='PIRs')
     parser.add_argument('-gpu', dest="ues_gpu", default='0', type=int,
                         help='GPU order, if value is -1, it use cpu. Default value 0')
@@ -42,9 +45,9 @@ def run_framework():
     # raise ValueError('my error!')
     arg_dict = create_arg_dict()
     framework_manager = fr.FrameworkManager(arg_dict)
-    # framework_manager.train_model()
-    framework_manager.train_final_model()
-    framework_manager.test_model()
+    framework_manager.train_model()
+    # framework_manager.train_final_model()
+    # framework_manager.test_model()
     # framework_manager.visualize_model()
 
 
