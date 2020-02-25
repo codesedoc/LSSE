@@ -10,14 +10,14 @@ import logging
 def create_arg_dict():
 
     arg_dict = {
-        'batch_size': 8,
+        'batch_size': 16,
         'learn_rate': 2e-5,
         # 'sgd_momentum': 0.4,
         'optimizer': 'adam',
         'k_fold': 10,
         'epoch': 3,
-        'warmup_steps': 0,
-        'max_steps': -1,
+        'warmup_steps': 200,
+        'max_steps': 800,
         # 'gcn_layer': 1,
         # 'position_encoding': True,
         # 'dropout': 0.5,
