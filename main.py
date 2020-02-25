@@ -45,9 +45,9 @@ def run_framework():
     # raise ValueError('my error!')
     arg_dict = create_arg_dict()
     framework_manager = fr.FrameworkManager(arg_dict)
-    framework_manager.train_model()
-    # framework_manager.train_final_model()
-    # framework_manager.test_model()
+    # framework_manager.train_model()
+    framework_manager.train_final_model()
+    framework_manager.test_model()
     # framework_manager.visualize_model()
 
 

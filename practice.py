@@ -25,6 +25,8 @@ import numpy as np
 
 x = torch.tensor([-1, 2, -3]*3)
 y = torch.abs_(x)
+if torch.isnan(y).sum()>0:
+    print(x)
 # # y[0] = 10
 print(y)
 #

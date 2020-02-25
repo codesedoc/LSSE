@@ -30,25 +30,26 @@ class SeE(fr.LSeE):
             'fully_regular': 1e-4,
             'bert_regular': 1e-4,
             'bert_hidden_dim': 768,
+            'sentence_max_len_for_bert': 128,
+            'pad_on_right': True,
             'dtype': torch.float32,
         }
         return arg_dict
 
     def create_models(self):
         self.bert = BertBase()
-        # self.bert_clsfy = BertForSeqClassify
-        self.config = torch.hub.load('huggingface/pytorch-transformers', 'config', 'bert-base-cased')
-        self.dropout = torch.nn.Dropout(self.config.hidden_dropout_prob)
-        self.classifier = torch.nn.Linear(self.config.hidden_size, 2)
-        self.classifier.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
+        config = self.bert.config
+        self.dropout = torch.nn.Dropout(config.hidden_dropout_prob)
+        self.classifier = torch.nn.Linear(config.hidden_size, 2)
+        self.classifier.weight.data.normal_(mean=0.0, std=config.initializer_range)
         self.classifier.bias.data.zero_()
 
 
     def deal_with_example_batch(self, example_ids, example_dict):
         examples = [example_dict[str(e_id.item())] for e_id in example_ids]
-        sentence_max_len = 128
-        pad_on_left = False
-        pad_token = 0
+        sentence_max_len = self.arg_dict['sentence_max_len_for_bert']
+        pad_on_right = self.arg_dict['pad_on_right']
+        pad_token = self.bert.tokenizer_cased.convert_tokens_to_ids([self.bert.tokenizer_cased.pad_token])[0]
         mask_padding_with_zero = True
         pad_token_segment_id = 0
 
@@ -56,33 +57,20 @@ class SeE(fr.LSeE):
         sentence2s = [e.sentence2 for e in examples]
         labels = torch.tensor([e.label for e in examples], dtype=torch.long, device=self.device)
 
-        sentence_pair_tokens_batch = []
+        input_ids_batch = []
+        token_type_ids_batch = []
+        attention_mask_batch = []
+        sep_index_batch = []
         for s1, s2 in zip(sentence1s, sentence2s):
-            # inputs = self.bert.tokenizer.encode_plus("Who was Jim Henson ?", "Jim Henson was a puppeteer", add_special_tokens=True,
-            #                                max_length=sentence_max_len, )
-
-            # inputs_ls = self.bert.tokenizer.encode_plus(s1.original_sentence(), s2.original_sentence(),
-            #                                          add_special_tokens=True,
-            #                                          max_length=sentence_max_len, )
-
-            # pad_token = self.bert.tokenizer.convert_tokens_to_ids([self.bert.tokenizer.pad_token])[0]
-
-            inputs_ls_cased = self.bert.tokenizer_cased.encode_plus(s1.original_sentence(), s2.original_sentence(),
+            inputs_ls_cased = self.bert.tokenizer_cased.encode_plus(s1.word_tokens(), s2.word_tokens(),
                                                                   add_special_tokens=True,
                                                                   max_length=sentence_max_len, )
             input_ids, token_type_ids = inputs_ls_cased["input_ids"], inputs_ls_cased["token_type_ids"]
 
-            # input_ids, token_type_ids = inputs["input_ids"], inputs["token_type_ids"]
-            # input_ids, token_type_ids = inputs_ls["input_ids"], inputs_ls["token_type_ids"]
-            # input_ids_cased = self.bert.tokenizer_cased.encode("Who was Jim Henson ?", "Jim Henson was a puppeteer", add_special_tokens=True,
-            #                                max_length=sentence_max_len, )
-            #
-
-
             attention_mask = [1 if mask_padding_with_zero else 0] * len(input_ids)
 
             padding_length = sentence_max_len - len(input_ids)
-            if pad_on_left:
+            if not pad_on_right:
                 input_ids = ([pad_token] * padding_length) + input_ids
                 attention_mask = ([0 if mask_padding_with_zero else 1] * padding_length) + attention_mask
                 token_type_ids = ([pad_token_segment_id] * padding_length) + token_type_ids
@@ -91,14 +79,18 @@ class SeE(fr.LSeE):
                 attention_mask = attention_mask + ([0 if mask_padding_with_zero else 1] * padding_length)
                 token_type_ids = token_type_ids + ([pad_token_segment_id] * padding_length)
 
-            inputs = {
-                'input_ids': input_ids,
-                'token_type_ids': token_type_ids,
-                'attention_mask': attention_mask,
-            }
-            sentence_pair_tokens_batch.append(inputs)
+            input_ids_batch.append(input_ids)
+            token_type_ids_batch.append(token_type_ids)
+            attention_mask_batch.append(attention_mask)
+            sep_index_batch.append(len(s1.word_tokens())+1)
+
+        input_ids_batch = torch.tensor(input_ids_batch, device=self.device)
+        token_type_ids_batch = torch.tensor(token_type_ids_batch, device=self.device)
+        attention_mask_batch = torch.tensor(attention_mask_batch, device=self.device)
         result = {
-            'sentence_pair_tokens_batch': sentence_pair_tokens_batch,
+            'input_ids_batch': input_ids_batch,
+            'token_type_ids_batch': token_type_ids_batch,
+            'attention_mask_batch': attention_mask_batch,
             'labels': labels
         }
         return result
@@ -171,53 +163,26 @@ class SeE(fr.LSeE):
             return result
 
     def forward(self, *input_data, **kwargs):
-        if len(kwargs) == 2: # common run or visualization
+        if len(kwargs) > 0: # common run or visualization
             data_batch = kwargs
-            sentence_pair_tokens_batch = data_batch['sentence_pair_tokens_batch']
+            input_ids_batch = data_batch['input_ids_batch']
+            token_type_ids_batch = data_batch['token_type_ids_batch']
+            attention_mask_batch = data_batch['attention_mask_batch']
             labels = data_batch['labels']
         else:
-            sentence_pair_tokens_batch, labels = input_data
-        input_ids_batch = torch.tensor([s['input_ids'] for s in sentence_pair_tokens_batch], device=self.device)
-        token_type_ids_batch = torch.tensor([s['token_type_ids'] for s in sentence_pair_tokens_batch], device=self.device)
-        attention_mask_batch = torch.tensor([s['attention_mask'] for s in sentence_pair_tokens_batch], device=self.device)
+            input_ids_batch, token_type_ids_batch, attention_mask_batch, labels = input_data
 
-
-        #
-        # # star_time = time.time()
-        # pooler_output = self.bert.dropout(pooler_output)
-        # result = self.bert.classifier(pooler_output)
-        # # result = torch.nn.Softmax()(result)
-        # # loss = torch.nn.CrossEntropyLoss()(result.view(-1, 2), labels.view(-1))
-        # predicts = np.array(result.detach().cpu().numpy())
-        #
-        # predicts = 1-predicts.argmax(axis=1)
-        #
-        # # result = result[:, 0]
-        #
-        # # predicts = predicts.argmax(axis=1)
-        # #
-        # # result = result[:, 1]
-        #
-        # # labels = labels.reshape_as(result)
-        # # labels = labels.to(dtype=result.dtype)
-        # labels = 1 - labels
-        # loss = torch.nn.CrossEntropyLoss()(result, labels)
-        _1, _2, _3, pooled_output = self.bert(input_ids_batch, token_type_ids_batch, attention_mask_batch)
+        last_hidden_states, pooled_output = self.bert(input_ids_batch, token_type_ids_batch, attention_mask_batch)
         output = self.dropout(pooled_output)
         predicts = self.classifier(output)
+        if torch.isnan(last_hidden_states).sum() > 0:
+            print(torch.isnan(last_hidden_states))
+            raise ValueError
 
-
-        # labels = 1 - labels
         loss = torch.nn.CrossEntropyLoss()(predicts.view(-1, 2), labels.view(-1))
 
-        # loss = torch.nn.CrossEntropyLoss()(result, labels)
-
-        # return loss, predicts  # (loss), logits, (hidden_states), (attentions)
-
-
-        # loss, predicts = self.bert_clsfy(input_ids_batch, token_type_ids_batch, attention_mask_batch, labels)
-        #
         predicts = np.array(predicts.detach().cpu().numpy()).argmax(axis=1)
+
         return loss, predicts
 
 
