@@ -25,7 +25,7 @@ def create_arg_dict():
         'ues_gpu': 0,
         'repeat_train': True,
         'corpus': corpus.mrpc.get_mrpc_obj,
-        'framework_name': "LSSE",
+        'framework_name': "LE",
         'task_type': 'classification',
         'seed': 1234
     }

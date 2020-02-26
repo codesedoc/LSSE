@@ -26,7 +26,7 @@ class LE(fr.LSeE):
     def create_arg_dict(self):
         arg_dict = {
             'semantic_compare_func': 'l2',
-            'fully_scales': [768, 150, 1],
+            'fully_scales': [768, 150, 2],
             # 'fully_regular': 1e-4,
             # 'bert_regular': 1e-4,
             'bert_hidden_dim': 768,
