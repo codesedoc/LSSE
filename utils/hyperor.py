@@ -40,7 +40,7 @@ class Hyperor:
             'batch_size': batch_size,
             'learn_rate': learn_rate,
             'gcn_layer': gcn_layer,
-            'epoch': 10,
+            'epoch': 8,
             'k_fold': 10,
             'repeat_train': True,
             'ues_gpu': 0,
