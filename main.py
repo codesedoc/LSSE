@@ -59,8 +59,8 @@ def run_hyperor():
 
 def main():
     # corpus.mrpc.get_mrpc_obj()
-    # run_framework()
-    run_hyperor()
+    run_framework()
+    # run_hyperor()
 
 
 def occupy_gpu():

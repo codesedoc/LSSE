@@ -27,8 +27,8 @@ class SeE(fr.LSeE):
         arg_dict = {
             # 'sgd_momentum': 0.4,
             'fully_scales': [768, 150, 1],
-            'fully_regular': 1e-4,
-            'bert_regular': 1e-4,
+            # 'fully_regular': 1e-4,
+            # 'bert_regular': 1e-4,
             'bert_hidden_dim': 768,
             'sentence_max_len_for_bert': 128,
             'pad_on_right': True,
@@ -55,9 +55,7 @@ class SeE(fr.LSeE):
         if self.arg_dict['repeat_train']:
             time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
             model_dir = file_tool.connect_path(self.result_path, 'train',
-                                               'bs:{}-lr:{}-fr:{}-br:{}'.
-                                               format(self.arg_dict['batch_size'], self.arg_dict['learn_rate'],
-                                                      self.arg_dict['fully_regular'], self.arg_dict['bert_regular'], ),
+                                               'bs:{}-lr:{}'.format(self.arg_dict['batch_size'], self.arg_dict['learn_rate'],),
                                                time_str)
 
         else:

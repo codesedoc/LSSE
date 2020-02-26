@@ -28,35 +28,72 @@ class LSyE(fr.LSSE):
             # 'sgd_momentum': 0.4,
             'semantic_compare_func': 'l2',
             'concatenate_input_for_gcn_hidden': True,
-            'fully_scales': [768, 150, 1],
+            'fully_scales': [768, 150, 2],
             'position_encoding': True,
-            'fully_regular': 1e-4,
-            'gcn_regular': 1e-4,
-            'bert_regular': 1e-4,
+            # 'fully_regular': 1e-4,
+            # 'gcn_regular': 1e-4,
+            # 'bert_regular': 1e-4,
             'gcn_layer': 2,
             'group_layer_limit_flag': False,
-            'group_layer_limit_list': [2, 3, 4, 5, 6],
+            # 'group_layer_limit_list': [2, 3, 4, 5, 6],
             'gcn_gate_flag': True,
             'gcn_norm_item': 0.5,
             'gcn_self_loop_flag': True,
             'gcn_hidden_dim': 768,
             'bert_hidden_dim': 768,
+            'pad_on_right': True,
+            'sentence_max_len_for_bert': 128,
             'dtype': torch.float32,
         }
         return arg_dict
 
-    def forward(self, *input_data, **kwargs):
-        if len(kwargs) == 5: # common run or visualization
-            data_batch = kwargs
-            sentence_pair_tokens = data_batch['sentence_pair_tokens_batch']
-            segment_ids = data_batch['segment_ids']
-            sep_index = data_batch['sep_index']
-            adj_matrix1s = data_batch['adj_matrix1s']
-            adj_matrix2s = data_batch['adj_matrix2s']
-        else:
-            sentence_pair_tokens, segment_ids, sep_index, adj_matrix1s, adj_matrix2s = input_data
+    def create_models(self):
+        self.bert = BertBase()
+        self.gcn = GCN(self.arg_dict)
+        self.semantic_layer = SemanticLayer(self.arg_dict)
+        self.fully_connection = FullyConnection(self.arg_dict)
+        self.gcn.apply(self.init_weights)
+        self.fully_connection.apply(self.init_weights)
 
-        _, sentence1_reps, sentence2_reps = self.bert(sentence_pair_tokens, segment_ids, sep_index)
+    def forward(self, *input_data, **kwargs):
+        if len(kwargs) > 0:  # common run or visualization
+            data_batch = kwargs
+            input_ids_batch = data_batch['input_ids_batch']
+            token_type_ids_batch = data_batch['token_type_ids_batch']
+            attention_mask_batch = data_batch['attention_mask_batch']
+            sep_index_batch = data_batch['sep_index_batch']
+
+            sent1_len_batch = data_batch['sent1_len_batch']
+            adj_matrix1_batch = data_batch['adj_matrix1_batch']
+
+            sent2_len_batch = data_batch['sent2_len_batch']
+            adj_matrix2_batch = data_batch['adj_matrix2_batch']
+            labels = data_batch['labels']
+
+        else:
+            input_ids_batch, token_type_ids_batch, attention_mask_batch, sep_index_batch, sent1_len_batch, \
+            adj_matrix1_batch, sent2_len_batch, adj_matrix2_batch, labels = input_data
+
+        last_hidden_states_batch, _ = self.bert(input_ids_batch, token_type_ids_batch, attention_mask_batch)
+
+        sent1_states_batch = []
+        sent2_states_batch = []
+        for i, hidden_states in enumerate(last_hidden_states_batch):
+            sent1_states = hidden_states[1:sep_index_batch[i]]
+            sent2_states = hidden_states[sep_index_batch[i] + 1: sep_index_batch[i] + 1 + sent2_len_batch[i]]
+            if len(sent1_states) != sent1_len_batch[i] or len(sent2_states) != sent2_len_batch[i]:
+                raise ValueError
+            if len(sent1_states) + len(sent2_states) + 3 != attention_mask_batch[i].sum():
+                raise ValueError
+            sent1_states = data_tool.padding_tensor(sent1_states, self.arg_dict['max_sentence_length'],
+                                                    align_dir='left', dim=0)
+            sent2_states = data_tool.padding_tensor(sent2_states, self.arg_dict['max_sentence_length'],
+                                                    align_dir='left', dim=0)
+            sent1_states_batch.append(sent1_states)
+            sent2_states_batch.append(sent2_states)
+
+        sent1_states_batch = torch.stack(sent1_states_batch, dim=0)
+        sent2_states_batch = torch.stack(sent2_states_batch, dim=0)
 
         def get_position_es(shape):
             position_encodings = general_tool.get_global_position_encodings(length=self.arg_dict['max_sentence_length'],
@@ -67,22 +104,27 @@ class LSyE(fr.LSSE):
             return position_encodings
 
         if self.arg_dict['position_encoding']:
-            shape1 = sentence1_reps.size()
+            shape1 = sent1_states_batch.size()
             position_es1 = get_position_es(shape1)
-            shape2 = sentence2_reps.size()
+            shape2 = sent2_states_batch.size()
             position_es2 = get_position_es(shape2)
-            sentence1_reps += position_es1
-            sentence2_reps += position_es2
+            sent1_states_batch += position_es1
+            sent2_states_batch += position_es2
 
         # star_time = time.time()
-        gcn_out1 = self.gcn(sentence1_reps, adj_matrix1s)
-        gcn_out2 = self.gcn(sentence2_reps, adj_matrix2s)
+        gcn_out1 = self.gcn(sent1_states_batch, adj_matrix1_batch)
+        gcn_out2 = self.gcn(sent2_states_batch, adj_matrix2_batch)
         if self.arg_dict['concatenate_input_for_gcn_hidden']:
-            gcn_out1 = torch.cat([gcn_out1, sentence1_reps], dim=2)
-            gcn_out2 = torch.cat([gcn_out2, sentence2_reps], dim=2)
+            gcn_out1 = torch.cat([gcn_out1, sent1_states_batch], dim=2)
+            gcn_out2 = torch.cat([gcn_out2, sent2_states_batch], dim=2)
         result = self.semantic_layer(gcn_out1, gcn_out2)
 
         result = self.fully_connection(result)
-        return result
+
+        loss = torch.nn.CrossEntropyLoss()(result.view(-1, 2), labels.view(-1))
+        predicts = np.array(result.detach().cpu().numpy()).argmax(axis=1)
+
+        return loss, predicts
+
 
 

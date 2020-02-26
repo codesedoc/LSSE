@@ -30,19 +30,19 @@ class LSSE(fr.Framework):
             'concatenate_input_for_gcn_hidden': True,
             'fully_scales': [768 * 2, 150, 2],
             'position_encoding': True,
-            'fully_regular': 1e-4,
-            'gcn_regular': 1e-4,
-            'bert_regular': 1e-4,
+            # 'fully_regular': 1e-4,
+            # 'gcn_regular': 1e-4,
+            # 'bert_regular': 1e-4,
             'gcn_layer': 2,
             'group_layer_limit_flag': False,
-            'group_layer_limit_list': [2, 3, 4, 5, 6],
+            # 'group_layer_limit_list': [2, 3, 4, 5, 6],
             'gcn_gate_flag': True,
             'gcn_norm_item': 0.5,
-            'pad_on_right': True,
             'gcn_self_loop_flag': True,
             'gcn_hidden_dim': 768,
             'bert_hidden_dim': 768,
-            'sentence_max_len_for_bert':128,
+            'pad_on_right': True,
+            'sentence_max_len_for_bert': 128,
             'dtype': torch.float32,
         }
         return arg_dict
@@ -60,10 +60,8 @@ class LSSE(fr.Framework):
                 gl = self.arg_dict['gcn_layer']
 
             model_dir = file_tool.connect_path(self.result_path, 'train',
-                                               'bs:{}-lr:{}-gl:{}-gr:{}-fr:{}-br:{}-com_fun:{}'.
+                                               'bs:{}-lr:{}-gl:{}--com_fun:{}'.
                                                format(self.arg_dict['batch_size'], self.arg_dict['learn_rate'], gl,
-                                                      self.arg_dict['gcn_regular'],
-                                                      self.arg_dict['fully_regular'], self.arg_dict['bert_regular'],
                                                       self.arg_dict['semantic_compare_func']), time_str)
 
         else:
@@ -167,53 +165,6 @@ class LSSE(fr.Framework):
             'labels': labels
         }
         return result
-
-    # def deal_with_example_batch(self, example_ids, example_dict):
-    #     examples = [example_dict[str(e_id.item())] for e_id in example_ids]
-    #     def get_sentence_input_info(sentences):
-    #         sentence_tokens_batch = []
-    #         adj_matrixs = []
-    #         sentence_max_len = 0
-    #         for s in sentences:
-    #             sentence_tokens_batch.append(s.word_tokens())
-    #             adj_matrixs.append(parser_tool.dependencies2adj_matrix(s.syntax_info['dependencies'],
-    #                                                                    self.arg_dict['dep_kind_count'],
-    #                                                                    self.arg_dict['max_sentence_length']))
-    #             s_len = len(s.word_tokens())
-    #             if s_len > sentence_max_len:
-    #                 sentence_max_len = s_len
-    #
-    #         sentence_tokens_batch = data_tool.align_mult_sentence_tokens(sentence_tokens_batch, sentence_max_len,
-    #                                                                      self.bert.tokenizer.unk_token, direction='left')
-    #         adj_matrixs = np.array(adj_matrixs)
-    #         adj_matrixs = adj_matrixs[..., 0:sentence_max_len, 0:sentence_max_len]
-    #
-    #         return sentence_tokens_batch, adj_matrixs, sentence_max_len
-    #
-    #     sentence1s = [e.sentence1 for e in examples]
-    #     sentence2s = [e.sentence2 for e in examples]
-    #
-    #     sentence_tokens_batch1, adj_matrix1s, sent_max_len1 = get_sentence_input_info(sentence1s)
-    #     sentence_tokens_batch2, adj_matrix2s, sent_max_len2 = get_sentence_input_info(sentence2s)
-    #
-    #     sentence_pair_tokens_batch = torch.tensor([self.bert.tokenizer.encode(s1, s2, add_special_tokens=True)
-    #                                               for s1, s2 in zip(sentence_tokens_batch1, sentence_tokens_batch2)],
-    #                                               device=self.device)
-    #
-    #     segment_ids = torch.cat([torch.zeros(sent_max_len1 + 2), torch.ones(sent_max_len2 + 1)]).to(
-    #         device=self.device, dtype=torch.long)
-    #     sep_index = sent_max_len1 + 1
-    #
-    #     adj_matrix1s = torch.from_numpy(adj_matrix1s).to(device=self.device, dtype=self.data_type)
-    #     adj_matrix2s = torch.from_numpy(adj_matrix2s).to(device=self.device, dtype=self.data_type)
-    #     result = {
-    #         'adj_matrix1s': adj_matrix1s,
-    #         'adj_matrix2s': adj_matrix2s,
-    #         'sentence_pair_tokens_batch': sentence_pair_tokens_batch,
-    #         'segment_ids': segment_ids,
-    #         'sep_index': sep_index,
-    #     }
-    #     return result
 
     def forward(self, *input_data, **kwargs):
         if len(kwargs) >0: # common run or visualization

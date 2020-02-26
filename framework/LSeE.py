@@ -26,10 +26,12 @@ class LSeE(fr.Framework):
     def create_arg_dict(self):
         arg_dict = {
             'semantic_compare_func': 'l2',
-            'fully_scales': [768 * 2, 150, 1],
-            'fully_regular': 1e-4,
-            'bert_regular': 1e-4,
+            'fully_scales': [768 * 2, 150, 2],
+            # 'fully_regular': 1e-4,
+            # 'bert_regular': 1e-4,
             'bert_hidden_dim': 768,
+            'pad_on_right': True,
+            'sentence_max_len_for_bert': 128,
             'dtype': torch.float32,
         }
         return arg_dict
@@ -40,9 +42,8 @@ class LSeE(fr.Framework):
         if self.arg_dict['repeat_train']:
             time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
             model_dir = file_tool.connect_path(self.result_path, 'train',
-                                               'bs:{}-lr:{}-fr:{}-br:{}-com_fun:{}'.
+                                               'bs:{}-lr:{}-com_fun:{}'.
                                                format(self.arg_dict['batch_size'], self.arg_dict['learn_rate'],
-                                                      self.arg_dict['fully_regular'], self.arg_dict['bert_regular'],
                                                       self.arg_dict['semantic_compare_func']), time_str)
 
         else:
@@ -54,64 +55,116 @@ class LSeE(fr.Framework):
         self.arg_dict['model_path'] = model_dir
 
     def create_models(self):
-        self.bert = ALBertBase()
+        self.bert = BertBase()
+        config = self.bert.config
+        self.dropout = torch.nn.Dropout(config.hidden_dropout_prob)
         self.semantic_layer = SemanticLayer(self.arg_dict)
         self.fully_connection = FullyConnection(self.arg_dict)
 
     def deal_with_example_batch(self, example_ids, example_dict):
         examples = [example_dict[str(e_id.item())] for e_id in example_ids]
-
-        def get_sentence_input_info(sentences):
-            sentence_tokens_batch = []
-            sentence_max_len = 0
-            for s in sentences:
-                sentence_tokens_batch.append(s.word_tokens())
-                s_len = len(s.word_tokens())
-                if s_len > sentence_max_len:
-                    sentence_max_len = s_len
-
-            sentence_tokens_batch = data_tool.align_mult_sentence_tokens(sentence_tokens_batch, sentence_max_len,
-                                                                         self.bert.tokenizer.unk_token, direction='left')
-            return sentence_tokens_batch, sentence_max_len
+        sentence_max_len = self.arg_dict['sentence_max_len_for_bert']
+        pad_on_right = self.arg_dict['pad_on_right']
+        pad_token = self.bert.tokenizer.convert_tokens_to_ids([self.bert.tokenizer.pad_token])[0]
+        mask_padding_with_zero = True
+        pad_token_segment_id = 0
 
         sentence1s = [e.sentence1 for e in examples]
         sentence2s = [e.sentence2 for e in examples]
 
-        sentence_tokens_batch1, sent_max_len1 = get_sentence_input_info(sentence1s)
-        sentence_tokens_batch2, sent_max_len2 = get_sentence_input_info(sentence2s)
+        labels = torch.tensor([e.label for e in examples], dtype=torch.long, device=self.device)
 
-        sentence_pair_tokens_batch = torch.tensor([self.bert.tokenizer.encode(s1, s2, add_special_tokens=True)
-                                                  for s1, s2 in zip(sentence_tokens_batch1, sentence_tokens_batch2)],
-                                                  device=self.device)
+        input_ids_batch = []
+        token_type_ids_batch = []
+        attention_mask_batch = []
+        sep_index_batch = []
+        sent1_len_batch = []
+        sent2_len_batch = []
 
-        segment_ids = torch.cat([torch.zeros(sent_max_len1 + 2), torch.ones(sent_max_len2 + 1)]).to(
-            device=self.device, dtype=torch.long)
-        sep_index = sent_max_len1 + 1
+        for s1, s2 in zip(sentence1s, sentence2s):
+            inputs_ls_cased = self.bert.tokenizer.encode_plus(s1.word_tokens(), s2.word_tokens(),
+                                                              add_special_tokens=True,
+                                                              max_length=sentence_max_len, )
+            input_ids, token_type_ids = inputs_ls_cased["input_ids"], inputs_ls_cased["token_type_ids"]
+
+            attention_mask = [1 if mask_padding_with_zero else 0] * len(input_ids)
+
+            padding_length = sentence_max_len - len(input_ids)
+            if not pad_on_right:
+                input_ids = ([pad_token] * padding_length) + input_ids
+                attention_mask = ([0 if mask_padding_with_zero else 1] * padding_length) + attention_mask
+                token_type_ids = ([pad_token_segment_id] * padding_length) + token_type_ids
+            else:
+                input_ids = input_ids + ([pad_token] * padding_length)
+                attention_mask = attention_mask + ([0 if mask_padding_with_zero else 1] * padding_length)
+                token_type_ids = token_type_ids + ([pad_token_segment_id] * padding_length)
+
+            input_ids_batch.append(input_ids)
+            token_type_ids_batch.append(token_type_ids)
+            attention_mask_batch.append(attention_mask)
+            sep_index_batch.append(len(s1.word_tokens()) + 1)
+            sent1_len_batch.append(len(s1.word_tokens()))
+            sent2_len_batch.append(len(s2.word_tokens()))
+
+        input_ids_batch = torch.tensor(input_ids_batch, device=self.device)
+        token_type_ids_batch = torch.tensor(token_type_ids_batch, device=self.device)
+        attention_mask_batch = torch.tensor(attention_mask_batch, device=self.device)
 
         result = {
-            'sentence_pair_tokens_batch': sentence_pair_tokens_batch,
-            'segment_ids': segment_ids,
-            'sep_index': sep_index,
+            'input_ids_batch': input_ids_batch,
+            'token_type_ids_batch': token_type_ids_batch,
+            'attention_mask_batch': attention_mask_batch,
+            'sep_index_batch': sep_index_batch,
+            'sent1_len_batch': sent1_len_batch,
+            'sent2_len_batch': sent2_len_batch,
+            'labels': labels
         }
         return result
 
     def forward(self, *input_data, **kwargs):
-        if len(kwargs) == 3: # common run or visualization
+        if len(kwargs) > 0: # common run or visualization
             data_batch = kwargs
-            sentence_pair_tokens = data_batch['sentence_pair_tokens_batch']
-            segment_ids = data_batch['segment_ids']
-            sep_index = data_batch['sep_index']
+            input_ids_batch = data_batch['input_ids_batch']
+            token_type_ids_batch = data_batch['token_type_ids_batch']
+            attention_mask_batch = data_batch['attention_mask_batch']
+            sep_index_batch = data_batch['sep_index_batch']
+            sent1_len_batch = data_batch['sent1_len_batch']
+            sent2_len_batch = data_batch['sent2_len_batch']
+            labels = data_batch['labels']
+
         else:
-            sentence_pair_tokens, segment_ids, sep_index = input_data
+            input_ids_batch, token_type_ids_batch, attention_mask_batch, sep_index_batch, sent1_len_batch, \
+            sent2_len_batch, labels = input_data
 
-        sentence_pair_reps, sentence1_reps, sentence2_reps = self.bert(sentence_pair_tokens, segment_ids, sep_index)
+        last_hidden_states_batch, pooled_output = self.bert(input_ids_batch, token_type_ids_batch, attention_mask_batch)
+        pooled_output = self.dropout(pooled_output)
 
-        # star_time = time.time()
-        result = self.semantic_layer(sentence1_reps, sentence2_reps)
-        result = torch.cat([sentence_pair_reps, result], dim=1)
+        sent1_states_batch = []
+        sent2_states_batch = []
+        for i, hidden_states in enumerate(last_hidden_states_batch):
+            sent1_states = hidden_states[1:sep_index_batch[i]]
+            sent2_states = hidden_states[sep_index_batch[i]+1: sep_index_batch[i]+1+sent2_len_batch[i]]
+            if len(sent1_states) != sent1_len_batch[i] or len(sent2_states) != sent2_len_batch[i]:
+                raise ValueError
+            if len(sent1_states) + len(sent2_states) + 3 != attention_mask_batch[i].sum():
+                raise ValueError
+            sent1_states = data_tool.padding_tensor(sent1_states, self.arg_dict['max_sentence_length'], align_dir='left', dim=0)
+            sent2_states = data_tool.padding_tensor(sent2_states, self.arg_dict['max_sentence_length'], align_dir='left', dim=0)
+            sent1_states_batch.append(sent1_states)
+            sent2_states_batch.append(sent2_states)
+
+        sent1_states_batch = torch.stack(sent1_states_batch, dim=0)
+        sent2_states_batch = torch.stack(sent2_states_batch, dim=0)
+
+        result = self.semantic_layer(sent1_states_batch, sent2_states_batch)
+        result = torch.cat([pooled_output, result], dim=1)
 
         result = self.fully_connection(result)
-        return result
+
+        loss = torch.nn.CrossEntropyLoss()(result.view(-1, 2), labels.view(-1))
+        predicts = np.array(result.detach().cpu().numpy()).argmax(axis=1)
+
+        return loss, predicts
 
     def get_regular_parts(self):
         regular_part_list = ( self.fully_connection, self.bert)

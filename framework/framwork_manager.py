@@ -439,6 +439,7 @@ class FrameworkManager:
             self.logger.info(
                 'epoch:{}  arg_loss:{}'.format(epoch + 1, loss_avg))
             loss_list.append(loss_avg)
+            self.logger.info("current learning rate:{}".format(self.scheduler.get_last_lr()[0]))
 
         record_dict = {
             'loss': loss_list,
