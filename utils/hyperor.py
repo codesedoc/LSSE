@@ -28,11 +28,20 @@ class Hyperor:
 
     def objective(self, trial):
         # general_tool.setup_seed(1234)
+        if trial.number >= 0:
+            batch_size = 16
+            learn_rate = 2e-5
+            gcn_layer = 8
+        else:
+            batch_size = self.batch_size_list[int(trial.suggest_discrete_uniform('batch_size_index', 0, len(self.batch_size_list)-1, 1))]
+            learn_rate = self.learn_rate_list[int(trial.suggest_discrete_uniform('learn_rate_factor', 0, len(self.learn_rate_list)-1, 1))]
+            gcn_layer = int(trial.suggest_discrete_uniform('gcn_hidden_layer', 8, 8, 1))
         arg_dict = {
-            'batch_size': self.batch_size_list[int(trial.suggest_discrete_uniform('batch_size_index', 0, len(self.batch_size_list)-1, 1))],
-            'learn_rate': self.learn_rate_list[int(trial.suggest_discrete_uniform('learn_rate_factor', 0, len(self.learn_rate_list)-1, 1))],
-            'gcn_layer': int(trial.suggest_discrete_uniform('gcn_hidden_layer', 2, 8, 1)),
-            'epoch': 50,
+            'batch_size': batch_size,
+            'learn_rate': learn_rate,
+            'gcn_layer': gcn_layer,
+            'epoch': 2,
+            'k_fold': 2,
             'repeat_train': True,
             'ues_gpu': 0,
             'start_up_trials': self.start_up_trials

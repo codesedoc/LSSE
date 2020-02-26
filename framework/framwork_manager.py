@@ -59,8 +59,6 @@ class FrameworkManager:
             self.framework_logger_name += str(trial.number)
         # self.create_framework()
 
-
-
     def __print_framework_parameter__(self):
         framework_parameter_count_dict = self.framework.count_of_parameter()
         self.logger.info("*" * 80)
@@ -185,6 +183,7 @@ class FrameworkManager:
         )
         step_count = 0
         max_steps_break = False
+        self.logger.info('total step:{} max step:{} warmup_steps:{} epoch:{} '.format(t_total, max_steps, self.arg_dict["warmup_steps"], train_epochs))
         try:
             best_result = None
             general_tool.setup_seed(self.arg_dict['seed'])
@@ -203,6 +202,7 @@ class FrameworkManager:
                     self.optimizer.step()
                     if hasattr(self, 'scheduler'):
                         self.scheduler.step()
+                        # self.logger.info("current learning rate:{}".format(self.scheduler.get_last_lr()[0]))
                     loss_avg += float(loss.item())
                     step_count += 1
                     if (max_steps > 0) and (step_count >= max_steps):
@@ -217,7 +217,7 @@ class FrameworkManager:
 
                 self.logger.info(
                     'epoch:{}  arg_loss:{}'.format(epoch + 1, loss_avg))
-                self.logger.info("learning_rate".format(self.scheduler.get_last_lr()[0]))
+                self.logger.info("current learning rate:{}".format(self.scheduler.get_last_lr()[0]))
                 with torch.no_grad():
                     evaluation_result = self.evaluation_calculation(valid_loader)
                     valid_accuracy = evaluation_result['metric']['accuracy']
