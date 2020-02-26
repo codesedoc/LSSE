@@ -28,7 +28,7 @@ class LSyE(fr.LSSE):
             # 'sgd_momentum': 0.4,
             'semantic_compare_func': 'l2',
             'concatenate_input_for_gcn_hidden': True,
-            'fully_scales': [768, 150, 2],
+            'fully_scales': [768, 2],
             'position_encoding': True,
             # 'fully_regular': 1e-4,
             # 'gcn_regular': 1e-4,

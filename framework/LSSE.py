@@ -28,7 +28,7 @@ class LSSE(fr.Framework):
             # 'sgd_momentum': 0.4,
             'semantic_compare_func': 'l2',
             'concatenate_input_for_gcn_hidden': True,
-            'fully_scales': [768 * 2, 150, 2],
+            'fully_scales': [768 * 2, 2],
             'position_encoding': True,
             # 'fully_regular': 1e-4,
             # 'gcn_regular': 1e-4,
@@ -244,13 +244,21 @@ class LSSE(fr.Framework):
 
     def get_input_of_visualize_model(self, example_ids, example_dict):
         data_batch = self.deal_with_example_batch(example_ids[0:1], example_dict)
-        sentence_pair_tokens = data_batch['sentence_pair_tokens_batch']
-        segment_ids = data_batch['segment_ids']
-        sep_index = torch.tensor(data_batch['sep_index'], device=self.device, dtype= torch.int)
-        adj_matrix1s = data_batch['adj_matrix1s']
-        adj_matrix2s = data_batch['adj_matrix2s']
 
-        input_data = (sentence_pair_tokens, segment_ids, sep_index, adj_matrix1s, adj_matrix2s)
+        input_ids_batch = data_batch['input_ids_batch']
+        token_type_ids_batch = data_batch['token_type_ids_batch']
+        attention_mask_batch = data_batch['attention_mask_batch']
+        sep_index_batch = torch.tensor(data_batch['sep_index_batch'], device=self.device)
+
+        sent1_len_batch = torch.tensor(data_batch['sent1_len_batch'], device=self.device)
+        adj_matrix1_batch = data_batch['adj_matrix1_batch']
+
+        sent2_len_batch = torch.tensor(data_batch['sent2_len_batch'], device=self.device)
+        adj_matrix2_batch = data_batch['adj_matrix2_batch']
+        labels = data_batch['labels']
+
+        input_data = (input_ids_batch, token_type_ids_batch, attention_mask_batch, sep_index_batch, sent1_len_batch,
+                      adj_matrix1_batch, sent2_len_batch, adj_matrix2_batch, labels)
 
         return input_data
 

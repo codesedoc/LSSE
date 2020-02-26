@@ -198,4 +198,16 @@ class SeE(fr.LSeE):
             predicts = np.array(predicts.detach().cpu().numpy()).argmax(axis=1)
         return loss, predicts
 
+    def get_input_of_visualize_model(self, example_ids, example_dict):
+        data_batch = self.deal_with_example_batch(example_ids[0:1], example_dict)
+
+        input_ids_batch = data_batch['input_ids_batch']
+        token_type_ids_batch = data_batch['token_type_ids_batch']
+        attention_mask_batch = data_batch['attention_mask_batch']
+        labels = data_batch['labels']
+
+        input_data = input_ids_batch, token_type_ids_batch, attention_mask_batch, labels
+
+        return input_data
+
 

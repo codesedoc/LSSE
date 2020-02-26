@@ -485,6 +485,7 @@ class FrameworkManager:
         pass
 
     def visualize_model(self):
+        self.create_framework()
         train_loader = self.data_manager.train_loader(self.arg_dict['batch_size'])
         batch = iter(train_loader).next()
         example_ids = batch['example_id']
@@ -492,7 +493,7 @@ class FrameworkManager:
         visualization_path = file_tool.connect_path(self.framework.result_path, 'visualization')
         file_tool.makedir(visualization_path)
         filename = visualization_tool.create_filename(visualization_path)
-        visualization_tool.log_graph(filename=filename, nn_model=self.framework, input_data=input_data, )
+        visualization_tool.log_graph(filename=filename, nn_model=self.framework, input_data=input_data)
 
     def save_model(self, cpu=False):
         if cpu:
