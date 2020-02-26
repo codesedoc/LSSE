@@ -10,22 +10,22 @@ import logging
 def create_arg_dict():
 
     arg_dict = {
-        'batch_size': 16,
+        'batch_size': 8,
         'learn_rate': 2e-5,
         # 'sgd_momentum': 0.4,
         'optimizer': 'adam',
         'k_fold': 10,
         'epoch': 3,
-        'warmup_steps': 200,
-        'max_steps': 800,
-        # 'gcn_layer': 1,
-        # 'position_encoding': True,
-        # 'dropout': 0.5,
+        'warmup_steps': 0,
+        'max_steps': -1,
+        'gcn_layer': 1,
+        'position_encoding': True,
+        'dropout': 0.4,
         'regular_flag': False,
         'ues_gpu': 0,
         'repeat_train': True,
         'corpus': corpus.mrpc.get_mrpc_obj,
-        'framework_name': "SeE",
+        'framework_name': "LSSE",
         'task_type': 'classification',
         'seed': 1234
     }

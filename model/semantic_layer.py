@@ -39,6 +39,9 @@ class SemanticLayer(torch.nn.Module):
         if (result == 0).any():
             result = self.revise_zero_data(result)
         result = torch.sqrt(result)
+
+        # result = torch.abs(sentence1s - sentence2s)
+
         return result
 
     def calculate_arc_cos(self, input_data1, input_data2):

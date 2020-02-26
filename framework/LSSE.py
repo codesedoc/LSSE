@@ -28,7 +28,7 @@ class LSSE(fr.Framework):
             # 'sgd_momentum': 0.4,
             'semantic_compare_func': 'l2',
             'concatenate_input_for_gcn_hidden': True,
-            'fully_scales': [768 * 2, 150, 1],
+            'fully_scales': [768 * 2, 150, 2],
             'position_encoding': True,
             'fully_regular': 1e-4,
             'gcn_regular': 1e-4,
@@ -38,9 +38,11 @@ class LSSE(fr.Framework):
             'group_layer_limit_list': [2, 3, 4, 5, 6],
             'gcn_gate_flag': True,
             'gcn_norm_item': 0.5,
+            'pad_on_right': True,
             'gcn_self_loop_flag': True,
             'gcn_hidden_dim': 768,
             'bert_hidden_dim': 768,
+            'sentence_max_len_for_bert':128,
             'dtype': torch.float32,
         }
         return arg_dict
@@ -72,71 +74,185 @@ class LSSE(fr.Framework):
             raise RuntimeError
         self.arg_dict['model_path'] = model_dir
 
+    def init_weights(self, module):
+        """ Initialize the weights """
+        if isinstance(module, (torch.nn.Linear)):
+            module.weight.data.normal_(mean=0.0, std=self.bert.config.initializer_range)
+
+        if isinstance(module, torch.nn.Linear) and module.bias is not None:
+            module.bias.data.zero_()
+
     def create_models(self):
-        self.bert = ALBertBase()
+        self.bert = BertBase()
+        self.dropout = torch.nn.Dropout(self.bert.config.hidden_dropout_prob)
         self.gcn = GCN(self.arg_dict)
         self.semantic_layer = SemanticLayer(self.arg_dict)
         self.fully_connection = FullyConnection(self.arg_dict)
+        self.gcn.apply(self.init_weights)
+        self.fully_connection.apply(self.init_weights)
 
     def deal_with_example_batch(self, example_ids, example_dict):
         examples = [example_dict[str(e_id.item())] for e_id in example_ids]
-        def get_sentence_input_info(sentences):
-            sentence_tokens_batch = []
-            adj_matrixs = []
-            sentence_max_len = 0
-            for s in sentences:
-                sentence_tokens_batch.append(s.word_tokens())
-                adj_matrixs.append(parser_tool.dependencies2adj_matrix(s.syntax_info['dependencies'],
-                                                                       self.arg_dict['dep_kind_count'],
-                                                                       self.arg_dict['max_sentence_length']))
-                s_len = len(s.word_tokens())
-                if s_len > sentence_max_len:
-                    sentence_max_len = s_len
-
-            sentence_tokens_batch = data_tool.align_mult_sentence_tokens(sentence_tokens_batch, sentence_max_len,
-                                                                         self.bert.tokenizer.unk_token, direction='left')
-            adj_matrixs = np.array(adj_matrixs)
-            adj_matrixs = adj_matrixs[..., 0:sentence_max_len, 0:sentence_max_len]
-
-            return sentence_tokens_batch, adj_matrixs, sentence_max_len
+        sentence_max_len = self.arg_dict['sentence_max_len_for_bert']
+        pad_on_right = self.arg_dict['pad_on_right']
+        pad_token = self.bert.tokenizer.convert_tokens_to_ids([self.bert.tokenizer.pad_token])[0]
+        mask_padding_with_zero = True
+        pad_token_segment_id = 0
 
         sentence1s = [e.sentence1 for e in examples]
         sentence2s = [e.sentence2 for e in examples]
 
-        sentence_tokens_batch1, adj_matrix1s, sent_max_len1 = get_sentence_input_info(sentence1s)
-        sentence_tokens_batch2, adj_matrix2s, sent_max_len2 = get_sentence_input_info(sentence2s)
+        def get_adj_matrix_batch(sentences):
+            adj_matrixs = []
+            for s in sentences:
+                adj_matrixs.append(parser_tool.dependencies2adj_matrix(s.syntax_info['dependencies'],
+                                                                       self.arg_dict['dep_kind_count'],
+                                                                       self.arg_dict['max_sentence_length']))
+            return torch.from_numpy(np.array(adj_matrixs)).to(device=self.device, dtype=self.data_type)
 
-        sentence_pair_tokens_batch = torch.tensor([self.bert.tokenizer.encode(s1, s2, add_special_tokens=True)
-                                                  for s1, s2 in zip(sentence_tokens_batch1, sentence_tokens_batch2)],
-                                                  device=self.device)
+        adj_matrix1_batch = get_adj_matrix_batch(sentence1s)
+        adj_matrix2_batch = get_adj_matrix_batch(sentence2s)
 
-        segment_ids = torch.cat([torch.zeros(sent_max_len1 + 2), torch.ones(sent_max_len2 + 1)]).to(
-            device=self.device, dtype=torch.long)
-        sep_index = sent_max_len1 + 1
+        labels = torch.tensor([e.label for e in examples], dtype=torch.long, device=self.device)
 
-        adj_matrix1s = torch.from_numpy(adj_matrix1s).to(device=self.device, dtype=self.data_type)
-        adj_matrix2s = torch.from_numpy(adj_matrix2s).to(device=self.device, dtype=self.data_type)
+        input_ids_batch = []
+        token_type_ids_batch = []
+        attention_mask_batch = []
+        sep_index_batch = []
+        sent1_len_batch = []
+        sent2_len_batch = []
+
+        for s1, s2 in zip(sentence1s, sentence2s):
+            inputs_ls_cased = self.bert.tokenizer.encode_plus(s1.word_tokens(), s2.word_tokens(),
+                                                                  add_special_tokens=True,
+                                                                  max_length=sentence_max_len, )
+            input_ids, token_type_ids = inputs_ls_cased["input_ids"], inputs_ls_cased["token_type_ids"]
+
+            attention_mask = [1 if mask_padding_with_zero else 0] * len(input_ids)
+
+            padding_length = sentence_max_len - len(input_ids)
+            if not pad_on_right:
+                input_ids = ([pad_token] * padding_length) + input_ids
+                attention_mask = ([0 if mask_padding_with_zero else 1] * padding_length) + attention_mask
+                token_type_ids = ([pad_token_segment_id] * padding_length) + token_type_ids
+            else:
+                input_ids = input_ids + ([pad_token] * padding_length)
+                attention_mask = attention_mask + ([0 if mask_padding_with_zero else 1] * padding_length)
+                token_type_ids = token_type_ids + ([pad_token_segment_id] * padding_length)
+
+            input_ids_batch.append(input_ids)
+            token_type_ids_batch.append(token_type_ids)
+            attention_mask_batch.append(attention_mask)
+            sep_index_batch.append(len(s1.word_tokens())+1)
+            sent1_len_batch.append(len(s1.word_tokens()))
+            sent2_len_batch.append(len(s2.word_tokens()))
+
+        input_ids_batch = torch.tensor(input_ids_batch, device=self.device)
+        token_type_ids_batch = torch.tensor(token_type_ids_batch, device=self.device)
+        attention_mask_batch = torch.tensor(attention_mask_batch, device=self.device)
+
+
+
         result = {
-            'adj_matrix1s': adj_matrix1s,
-            'adj_matrix2s': adj_matrix2s,
-            'sentence_pair_tokens_batch': sentence_pair_tokens_batch,
-            'segment_ids': segment_ids,
-            'sep_index': sep_index,
+            'input_ids_batch': input_ids_batch,
+            'token_type_ids_batch': token_type_ids_batch,
+            'attention_mask_batch': attention_mask_batch,
+            'sep_index_batch': sep_index_batch,
+            'sent1_len_batch': sent1_len_batch,
+            'adj_matrix1_batch': adj_matrix1_batch,
+
+            'sent2_len_batch': sent2_len_batch,
+            'adj_matrix2_batch': adj_matrix2_batch,
+
+            'labels': labels
         }
         return result
 
-    def forward(self, *input_data, **kwargs):
-        if len(kwargs) == 5: # common run or visualization
-            data_batch = kwargs
-            sentence_pair_tokens = data_batch['sentence_pair_tokens_batch']
-            segment_ids = data_batch['segment_ids']
-            sep_index = data_batch['sep_index']
-            adj_matrix1s = data_batch['adj_matrix1s']
-            adj_matrix2s = data_batch['adj_matrix2s']
-        else:
-            sentence_pair_tokens, segment_ids, sep_index, adj_matrix1s, adj_matrix2s = input_data
+    # def deal_with_example_batch(self, example_ids, example_dict):
+    #     examples = [example_dict[str(e_id.item())] for e_id in example_ids]
+    #     def get_sentence_input_info(sentences):
+    #         sentence_tokens_batch = []
+    #         adj_matrixs = []
+    #         sentence_max_len = 0
+    #         for s in sentences:
+    #             sentence_tokens_batch.append(s.word_tokens())
+    #             adj_matrixs.append(parser_tool.dependencies2adj_matrix(s.syntax_info['dependencies'],
+    #                                                                    self.arg_dict['dep_kind_count'],
+    #                                                                    self.arg_dict['max_sentence_length']))
+    #             s_len = len(s.word_tokens())
+    #             if s_len > sentence_max_len:
+    #                 sentence_max_len = s_len
+    #
+    #         sentence_tokens_batch = data_tool.align_mult_sentence_tokens(sentence_tokens_batch, sentence_max_len,
+    #                                                                      self.bert.tokenizer.unk_token, direction='left')
+    #         adj_matrixs = np.array(adj_matrixs)
+    #         adj_matrixs = adj_matrixs[..., 0:sentence_max_len, 0:sentence_max_len]
+    #
+    #         return sentence_tokens_batch, adj_matrixs, sentence_max_len
+    #
+    #     sentence1s = [e.sentence1 for e in examples]
+    #     sentence2s = [e.sentence2 for e in examples]
+    #
+    #     sentence_tokens_batch1, adj_matrix1s, sent_max_len1 = get_sentence_input_info(sentence1s)
+    #     sentence_tokens_batch2, adj_matrix2s, sent_max_len2 = get_sentence_input_info(sentence2s)
+    #
+    #     sentence_pair_tokens_batch = torch.tensor([self.bert.tokenizer.encode(s1, s2, add_special_tokens=True)
+    #                                               for s1, s2 in zip(sentence_tokens_batch1, sentence_tokens_batch2)],
+    #                                               device=self.device)
+    #
+    #     segment_ids = torch.cat([torch.zeros(sent_max_len1 + 2), torch.ones(sent_max_len2 + 1)]).to(
+    #         device=self.device, dtype=torch.long)
+    #     sep_index = sent_max_len1 + 1
+    #
+    #     adj_matrix1s = torch.from_numpy(adj_matrix1s).to(device=self.device, dtype=self.data_type)
+    #     adj_matrix2s = torch.from_numpy(adj_matrix2s).to(device=self.device, dtype=self.data_type)
+    #     result = {
+    #         'adj_matrix1s': adj_matrix1s,
+    #         'adj_matrix2s': adj_matrix2s,
+    #         'sentence_pair_tokens_batch': sentence_pair_tokens_batch,
+    #         'segment_ids': segment_ids,
+    #         'sep_index': sep_index,
+    #     }
+    #     return result
 
-        sentence_pair_reps, sentence1_reps, sentence2_reps = self.bert(sentence_pair_tokens, segment_ids, sep_index)
+    def forward(self, *input_data, **kwargs):
+        if len(kwargs) >0: # common run or visualization
+            data_batch = kwargs
+            input_ids_batch = data_batch['input_ids_batch']
+            token_type_ids_batch = data_batch['token_type_ids_batch']
+            attention_mask_batch = data_batch['attention_mask_batch']
+            sep_index_batch = data_batch['sep_index_batch']
+
+            sent1_len_batch = data_batch['sent1_len_batch']
+            adj_matrix1_batch = data_batch['adj_matrix1_batch']
+
+            sent2_len_batch = data_batch['sent2_len_batch']
+            adj_matrix2_batch = data_batch['adj_matrix2_batch']
+            labels = data_batch['labels']
+
+        else:
+            input_ids_batch, token_type_ids_batch, attention_mask_batch, sep_index_batch, sent1_len_batch, \
+            adj_matrix1_batch, sent2_len_batch, adj_matrix2_batch, labels = input_data
+
+        last_hidden_states_batch, pooled_output = self.bert(input_ids_batch, token_type_ids_batch, attention_mask_batch)
+        pooled_output = self.dropout(pooled_output)
+
+        sent1_states_batch = []
+        sent2_states_batch = []
+        for i, hidden_states in enumerate(last_hidden_states_batch):
+            sent1_states = hidden_states[1:sep_index_batch[i]]
+            sent2_states = hidden_states[sep_index_batch[i]+1: sep_index_batch[i]+1+sent2_len_batch[i]]
+            if len(sent1_states) != sent1_len_batch[i] or len(sent2_states) != sent2_len_batch[i]:
+                raise ValueError
+            if len(sent1_states) + len(sent2_states) + 3 != attention_mask_batch[i].sum():
+                raise ValueError
+            sent1_states = data_tool.padding_tensor(sent1_states, self.arg_dict['max_sentence_length'], align_dir='left', dim=0)
+            sent2_states = data_tool.padding_tensor(sent2_states, self.arg_dict['max_sentence_length'], align_dir='left', dim=0)
+            sent1_states_batch.append(sent1_states)
+            sent2_states_batch.append(sent2_states)
+
+        sent1_states_batch = torch.stack(sent1_states_batch, dim=0)
+        sent2_states_batch = torch.stack(sent2_states_batch, dim=0)
 
         def get_position_es(shape):
             position_encodings = general_tool.get_global_position_encodings(length=self.arg_dict['max_sentence_length'],
@@ -147,27 +263,28 @@ class LSSE(fr.Framework):
             return position_encodings
 
         if self.arg_dict['position_encoding']:
-            shape1 = sentence1_reps.size()
+            shape1 = sent1_states_batch.size()
             position_es1 = get_position_es(shape1)
-            shape2 = sentence2_reps.size()
+            shape2 = sent2_states_batch.size()
             position_es2 = get_position_es(shape2)
-            sentence1_reps += position_es1
-            sentence2_reps += position_es2
+            sent1_states_batch += position_es1
+            sent2_states_batch += position_es2
 
         # star_time = time.time()
-        gcn_out1 = self.gcn(sentence1_reps, adj_matrix1s)
-        gcn_out2 = self.gcn(sentence2_reps, adj_matrix2s)
+        gcn_out1 = self.gcn(sent1_states_batch, adj_matrix1_batch)
+        gcn_out2 = self.gcn(sent2_states_batch, adj_matrix2_batch)
         if self.arg_dict['concatenate_input_for_gcn_hidden']:
-            gcn_out1 = torch.cat([gcn_out1, sentence1_reps], dim=2)
-            gcn_out2 = torch.cat([gcn_out2, sentence2_reps], dim=2)
+            gcn_out1 = torch.cat([gcn_out1, sent1_states_batch], dim=2)
+            gcn_out2 = torch.cat([gcn_out2, sent2_states_batch], dim=2)
         result = self.semantic_layer(gcn_out1, gcn_out2)
-        result = torch.cat([sentence_pair_reps, result], dim=1)
+        result = torch.cat([pooled_output, result], dim=1)
 
         result = self.fully_connection(result)
-        return result
 
-    # def run_batch(self, batch):
-    #     raise RuntimeError("have not implemented this abstract method")
+        loss = torch.nn.CrossEntropyLoss()(result.view(-1, 2), labels.view(-1))
+        predicts = np.array(result.detach().cpu().numpy()).argmax(axis=1)
+
+        return loss, predicts
 
     def get_regular_parts(self):
         regular_part_list = (self.gcn, self.fully_connection, self.bert)
@@ -185,7 +302,6 @@ class LSSE(fr.Framework):
         input_data = (sentence_pair_tokens, segment_ids, sep_index, adj_matrix1s, adj_matrix2s)
 
         return input_data
-
 
     def count_of_parameter(self):
         with torch.no_grad():

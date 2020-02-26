@@ -10,7 +10,7 @@ class FullyConnection(torch.nn.Module):
         for i in range(1, len(scales)):
             layer_list.append(torch.nn.Linear(scales[i - 1], scales[i], bias=True))
             active_list.append(torch.nn.Tanh())
-        active_list[-1] = torch.nn.Sigmoid()
+        del active_list[-1]
         self.layer_list = torch.nn.ModuleList(layer_list)
         self.active_list = torch.nn.ModuleList(active_list)
         gpu_id = arg_dict['ues_gpu']
@@ -25,9 +25,11 @@ class FullyConnection(torch.nn.Module):
         if torch.isnan(result).sum() > 0:
             print(torch.isnan(result))
             raise ValueError
-        for model_, active in zip(self.layer_list, self.active_list):
-            result = model_(result)
-            result = active(result)
+        layer_num = len(self.layer_list)
+        for i, linear, in enumerate(self.layer_list):
+            result = linear(result)
+            if i < layer_num - 1:
+                result = self.active_list[i](result)
 
         return result
 

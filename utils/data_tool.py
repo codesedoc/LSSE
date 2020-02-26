@@ -2,6 +2,7 @@ import torch.utils.data as torch_data
 import corpus.base_corpus as base_corpus
 import random
 import numpy as np
+import torch
 
 
 class MyDateSet(torch_data.Dataset):
@@ -307,4 +308,20 @@ def align_mult_sentence_tokens(mult_sentence_tokens, max_sentence_len, unk_token
         if len(t) != len(result[0]):
             raise ValueError("align defeat!")
     return result
+
+
+def padding_tensor(tensor_, max_sentence_len, align_dir='left', dim=0):
+    padding_len = max_sentence_len - len(tensor_)
+    if padding_len < 0:
+        raise ValueError("padding max len smaller")
+    shape = torch.tensor(tensor_.size(), dtype=torch.int).tolist()
+    shape[dim] = padding_len
+    pad_tensor = torch.zeros(shape, dtype=tensor_.dtype, device=tensor_.device)
+    if align_dir == 'left':
+        tensor_ = torch.cat([tensor_, pad_tensor], dim=dim)
+    elif align_dir == 'right':
+        tensor_ = torch.cat([pad_tensor, tensor_], dim=dim)
+    else:
+        raise ValueError("Unknow direction parameter")
+    return tensor_
 
