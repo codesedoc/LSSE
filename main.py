@@ -27,6 +27,7 @@ def create_arg_dict():
         'corpus': corpus.mrpc.get_mrpc_obj,
         'framework_name': "LSSE",
         'task_type': 'classification',
+        # 'max_sentence_length': 45,
         'seed': 1234
     }
     general_tool.setup_seed(arg_dict['seed'])
@@ -46,9 +47,9 @@ def run_framework():
     arg_dict = create_arg_dict()
     framework_manager = fr.FrameworkManager(arg_dict)
     # framework_manager.train_model()
-    # framework_manager.train_final_model()
-    # framework_manager.test_model()
-    framework_manager.visualize_model()
+    framework_manager.train_final_model()
+    framework_manager.test_model()
+    # framework_manager.visualize_model()
 
 
 def run_hyperor():
@@ -59,8 +60,8 @@ def run_hyperor():
 
 def main():
     # corpus.mrpc.get_mrpc_obj()
-    # run_framework()
-    run_hyperor()
+    run_framework()
+    # run_hyperor()
 
 
 def occupy_gpu():

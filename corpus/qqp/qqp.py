@@ -288,7 +288,7 @@ class Qqp(base_corpus.Corpus):
                 break
             length_threshold = int(length_threshold)
             temp = sent_len_table[:length_threshold + 1].sum()
-            print('number of sentence smaller than threshold: {}, rate:{}'.format(temp, round(temp/count, 2)))
+            print('{}/{}, rate:{}'.format(temp, count-temp, round(temp/count, 6)))
 
 
 single_qqp_obj = None
