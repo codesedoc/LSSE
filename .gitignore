@@ -21,4 +21,5 @@ result/visualization
 /**/*.pt
 /**/*.pkls
 /**/*.db
+/**/*.tsv
 #/**/result
