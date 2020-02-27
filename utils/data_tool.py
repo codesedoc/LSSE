@@ -89,9 +89,9 @@ class ExampleManager:
             positive_part, negative_part = part_pair
             result[i] = positive_part.copy()
             result[i].extend(negative_part)
-            print([int(e.label) for e in result[i]])
+            # print([int(e.label) for e in result[i]])
             random.shuffle(result[i])
-            print([int(e.label) for e in result[i]])
+            # print([int(e.label) for e in result[i]])
         return result
 
 
@@ -153,9 +153,9 @@ class DataManager:
             valid_loader = self.create_loader(MyDateSet(valid_group.copy()), batch_size=batch_size, example_dict=self.corpus.train_example_dict)
             loader_tuple = (train_loader, valid_loader)
             # print('train_loader:{}  valid_loader:{}'.format(len(train_loader), len(valid_loader)))
-            self.check_data_loader_tuple(loader_tuple)
+            # self.check_data_loader_tuple(loader_tuple)
             result.append(loader_tuple)
-        self.check_data_loader_tuple_list(result)
+        # self.check_data_loader_tuple_list(result)
         return result
 
     def create_loader(self, data_set, drop_last=False, batch_size=2, shuffle=True, example_dict=None):

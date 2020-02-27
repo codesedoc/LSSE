@@ -289,8 +289,14 @@ def dependencies2adj_matrix(numeral_dependencies, max_dep_kind, max_sent_len):
     result = np.zeros((max_dep_kind, max_sent_len, max_sent_len), dtype=np.int)
     numeral_dependencies = np.array(numeral_dependencies, dtype=np.int)
     dependencies_temp = numeral_dependencies[:, (2, 0, 1)]
+    out_of_range_dep = []
     for dependency in dependencies_temp:
+        if (dependency[1] >= max_sent_len) or (dependency[2] >= max_sent_len):
+            out_of_range_dep.append(dependency)
+            continue
         result[tuple(dependency.reshape(-1, 1).tolist())] = 1
+    if len(out_of_range_dep) > 0:
+        print("count of dependencies out of range: {}".format(len(out_of_range_dep)))
     return result
 
 

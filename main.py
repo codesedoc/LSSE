@@ -24,8 +24,8 @@ def create_arg_dict():
         'regular_flag': False,
         'ues_gpu': -1,
         'repeat_train': True,
-        'corpus': corpus.qqp.get_qqp_obj,
-        'max_sentence_length': 45,
+        'corpus': corpus.mrpc.get_mrpc_obj,
+        # 'max_sentence_length': 50,
         'framework_name': "LSSE",
         'task_type': 'classification',
         'seed': 1234
