@@ -25,7 +25,7 @@ def create_arg_dict():
         'ues_gpu': -1,
         'repeat_train': True,
         'corpus': corpus.mrpc.get_mrpc_obj,
-        'framework_name': "LE",
+        'framework_name': "LSSE",
         'task_type': 'classification',
         'seed': 1234
     }
@@ -59,8 +59,8 @@ def run_hyperor():
 
 def main():
     # corpus.mrpc.get_mrpc_obj()
-    run_framework()
-    # run_hyperor()
+    # run_framework()
+    run_hyperor()
 
 
 def occupy_gpu():
@@ -79,7 +79,7 @@ if __name__ == '__main__':
         main()
     except Exception as e:
         logging.exception(e)
-        # memory = occupy_gpu()
-        # while(True): pass
+        memory = occupy_gpu()
+        while(True): pass
 
     pass

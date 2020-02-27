@@ -22,26 +22,26 @@ class Hyperor:
 
         logger_filename = file_tool.connect_path(self.study_path, 'log.txt')
         self.logger = log_tool.get_logger('my_optuna', logger_filename, log_format=logging.Formatter("%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
-        self.batch_size_list = [4, 8, 16, 32]
-        self.learn_rate_list = [5e-5, 1e-5, 8e-6, 4e-6, 2e-6]
-        self.trial_times = 80
+        self.batch_size_list = [8, 16, 32]
+        self.learn_rate_list = [5e-5, 3e-5, 2e-5, 1e-5, 2e-6]
+        self.trial_times = 30
 
     def objective(self, trial):
-        # general_tool.setup_seed(1234)
-        if trial.number >= 0:
-            batch_size = 16
+        general_tool.setup_seed(1234)
+        if trial.number == 0:
+            batch_size = 8
             learn_rate = 2e-5
-            gcn_layer = 8
+            gcn_layer = 2
         else:
             batch_size = self.batch_size_list[int(trial.suggest_discrete_uniform('batch_size_index', 0, len(self.batch_size_list)-1, 1))]
             learn_rate = self.learn_rate_list[int(trial.suggest_discrete_uniform('learn_rate_factor', 0, len(self.learn_rate_list)-1, 1))]
-            gcn_layer = int(trial.suggest_discrete_uniform('gcn_hidden_layer', 8, 8, 1))
+            gcn_layer = int(trial.suggest_discrete_uniform('gcn_hidden_layer', 2, 6, 1))
         arg_dict = {
             'batch_size': batch_size,
             'learn_rate': learn_rate,
             'gcn_layer': gcn_layer,
-            'epoch': 2,
-            'k_fold': 2,
+            'epoch': 8,
+            'k_fold': 10,
             'repeat_train': True,
             'ues_gpu': 0,
             'start_up_trials': self.start_up_trials
