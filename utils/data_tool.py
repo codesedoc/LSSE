@@ -313,7 +313,8 @@ def align_mult_sentence_tokens(mult_sentence_tokens, max_sentence_len, unk_token
 def padding_tensor(tensor_, max_sentence_len, align_dir='left', dim=0):
     padding_len = max_sentence_len - len(tensor_)
     if padding_len < 0:
-        raise ValueError("padding max len smaller")
+        print("padding max len smaller")
+        return tensor_
     shape = torch.tensor(tensor_.size(), dtype=torch.int).tolist()
     shape[dim] = padding_len
     pad_tensor = torch.zeros(shape, dtype=tensor_.dtype, device=tensor_.device)
