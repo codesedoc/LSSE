@@ -315,7 +315,7 @@ def padding_tensor(tensor_, max_sentence_len, align_dir='left', dim=0):
     if padding_len < 0:
         print("padding max len smaller")
         indexes = [i for i in range(max_sentence_len)]
-        indexes = torch.LongTensor(indexes)
+        indexes = torch.LongTensor(indexes).to(tensor_.device)
         tensor_ = tensor_.index_select(dim=dim, index=indexes)
         return tensor_
 
