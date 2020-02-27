@@ -8,6 +8,7 @@ import utils.general_tool as general_tool
 
 import utils.data_tool as data_tool
 from model import *
+import corpus
 
 
 class LSSE(fr.Framework):
@@ -194,9 +195,14 @@ class LSSE(fr.Framework):
             sent1_states = hidden_states[1:sep_index_batch[i]]
             sent2_states = hidden_states[sep_index_batch[i]+1: sep_index_batch[i]+1+sent2_len_batch[i]]
             if len(sent1_states) != sent1_len_batch[i] or len(sent2_states) != sent2_len_batch[i]:
-                raise ValueError
+                # print("sentence input of bert not match the input of gcn max length")
+                if self.arg_dict["corpus"] != corpus.qqp.get_qqp_obj:
+                    raise ValueError
             if len(sent1_states) + len(sent2_states) + 3 != attention_mask_batch[i].sum():
-                raise ValueError
+                # print("sentence input of bert not match the input of gcn max length")
+                if self.arg_dict["corpus"] != corpus.qqp.get_qqp_obj:
+                    raise ValueError
+
             sent1_states = data_tool.padding_tensor(sent1_states, self.arg_dict['max_sentence_length'], align_dir='left', dim=0)
             sent2_states = data_tool.padding_tensor(sent2_states, self.arg_dict['max_sentence_length'], align_dir='left', dim=0)
             sent1_states_batch.append(sent1_states)
