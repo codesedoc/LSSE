@@ -34,7 +34,7 @@ class Hyperor:
             gcn_layer = 2
         else:
             batch_size = self.batch_size_list[int(trial.suggest_discrete_uniform('batch_size_index', 0, len(self.batch_size_list)-1, 1))]
-            learn_rate = self.learn_rate_list[int(trial.suggest_discrete_uniform('learn_rate_factor', 0, len(self.learn_rate_list)-1, 1))]
+            learn_rate = self.learn_rate_list[int(trial.suggest_discrete_uniform('learn_rate_index', 0, len(self.learn_rate_list)-1, 1))]
             gcn_layer = int(trial.suggest_discrete_uniform('gcn_hidden_layer', 2, 6, 1))
         arg_dict = {
             'batch_size': batch_size,
