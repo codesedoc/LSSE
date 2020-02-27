@@ -314,7 +314,11 @@ def padding_tensor(tensor_, max_sentence_len, align_dir='left', dim=0):
     padding_len = max_sentence_len - len(tensor_)
     if padding_len < 0:
         print("padding max len smaller")
+        indexes = [i for i in range(max_sentence_len)]
+        indexes = torch.LongTensor(indexes)
+        tensor_ = tensor_.index_select(dim=dim, index=indexes)
         return tensor_
+
     shape = torch.tensor(tensor_.size(), dtype=torch.int).tolist()
     shape[dim] = padding_len
     pad_tensor = torch.zeros(shape, dtype=tensor_.dtype, device=tensor_.device)
