@@ -11,7 +11,7 @@ single_mrpc_obj = None
 
 
 class Qqp(base_corpus.Corpus):
-    data_path = ''
+    data_path = 'corpus/qqp'
 
     def __extra_examples_from_org_file__(self, org_file, des_filename):
         if file_tool.check_file(des_filename):
@@ -257,8 +257,8 @@ class Qqp(base_corpus.Corpus):
         self.create_examples()
         self.parse_sentences()
 
-        test_file = file_tool.connect_path('', 'test.tsv')
-        train_file = file_tool.connect_path('', 'train.tsv')
+        test_file = file_tool.connect_path(self.data_path, 'test.tsv')
+        train_file = file_tool.connect_path(self.data_path, 'train.tsv')
         self.__create_new_data_set__(self.train_example_list, train_file)
         self.__create_new_data_set__(self.test_example_list, test_file)
         print('sentence count:{}'.format(len(self.sentence_dict)))
@@ -298,7 +298,7 @@ def get_qqp_obj(force=False):
 
     global single_qqp_obj
     if force or (single_qqp_obj is None):
-        single_qqp_obj_file = file_tool.connect_path("", 'qqp_obj.pkl')
+        single_qqp_obj_file = file_tool.connect_path("corpus/qqp", 'qqp_obj.pkl')
         if file_tool.check_file(single_qqp_obj_file):
             single_qqp_obj = file_tool.load_data_pickle(single_qqp_obj_file)
         else:
