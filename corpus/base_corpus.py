@@ -51,6 +51,9 @@ class Corpus:
         self.sentence_list = None
         self.parse_info = None
 
+        self.create_data()
+
+    def create_data(self):
         self.create_sentences()
         self.parse_sentences()
         self.create_examples()

@@ -1,5 +1,6 @@
 import os
 import pickle
+import csv
 
 
 def get_absolute_path(file):
@@ -56,6 +57,19 @@ def check_dir(path):
 
 def check_file(filename):
     return os.path.exists(filename)
+
+
+def read_tsv(input_file, quotechar=None):
+    """Reads a tab separated value file."""
+    with open(input_file, "r", encoding="utf-8-sig") as f:
+        return list(csv.reader(f, delimiter="\t", quotechar=quotechar))
+
+
+def write_lines_to_tsv(data_list_lines, input_file, quotechar=None):
+    with open(input_file, 'w') as f:
+        tsv_w = csv.writer(f, delimiter='\t', quotechar=quotechar)
+        for line in data_list_lines:
+            tsv_w.writerow(line)
 
 
 class FileOperator:
