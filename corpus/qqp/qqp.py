@@ -5,6 +5,7 @@ import utils.general_tool as general_tool
 import random
 import time
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 single_mrpc_obj = None
@@ -257,38 +258,95 @@ class Qqp(base_corpus.Corpus):
         self.create_examples()
         self.parse_sentences()
 
+        print('{}'.format(['*'] * 80))
+        print('finished load orig data and create objects')
+        print('sentence count:{}'.format(len(self.sentence_dict)))
+        print('train example count:{}'.format(len(self.train_example_dict.keys())))
+        print('test example count:{}'.format(len(self.test_example_dict.keys())))
+        print('{}'.format(['*'] * 80), end='\n\n')
+
+        self.modify_data()
+        self.save_data()
+        
+    def modify_data(self):
+        print("Whether deleted examples with too long sentence, y/n?")
+        delete_flag = input()
+
+        while(True):
+            if delete_flag == 'y':
+                self.__delete_examples_by_sent_len_threshold__(50)
+            elif delete_flag == 'n':
+                break
+
+    def save_data(self):
         test_file = file_tool.connect_path(self.data_path, 'test.tsv')
         train_file = file_tool.connect_path(self.data_path, 'train.tsv')
         self.__create_new_data_set__(self.train_example_list, train_file)
         self.__create_new_data_set__(self.test_example_list, test_file)
-        print('sentence count:{}'.format(len(self.sentence_dict)))
-        print('train example count:{}'.format(len(self.train_example_dict.keys())))
-        print('test example count:{}'.format(len(self.test_example_dict.keys())))
 
-    @staticmethod
-    def show_pared_info(corpus_obj):
-        print('the count of dep type:{}'.format(corpus_obj.parse_info.dependency_count))
-        print('the max len of sentence_tokens:{}, correspond sent id:{}'.format(corpus_obj.parse_info.max_sent_len,
-                                                                                corpus_obj.parse_info.max_sent_id))
-        print('the average len of sentence_tokens:{}'.format(corpus_obj.parse_info.avg_sent_len))
-        sent_len_table = corpus_obj.parse_info.sent_len_table
+    def __delete_examples_by_sent_len_threshold__(self, threshold):
+        def delete_examples_from_dict(example_dict, example_ids):
+            deleted_es = []
+            for e_id in example_ids:
+                deleted_es = example_dict.pop(str(e_id))
+            print("deleted {} examples".format(len(deleted_es)))
+            return example_dict
+
+        self.sent_distribute_count()
+
+        print("length threshold is {}".format(threshold))
+
+        train_old_count = len(self.train_example_dict)
+        test_old_count = len(self.test_example_dict)
+
+        train_delete_examples = self.__collect_examples_over_threshold__(self.train_example_list, threshold)
+        test_delete_examples = self.__collect_examples_over_threshold__(self.test_example_list, threshold)
+
+        delete_examples_from_dict(self.train_example_dict, [e.id for e in train_delete_examples])
+        delete_examples_from_dict(self.test_example_dict, [e.id for e in test_delete_examples])
+
+        self.train_example_list = self.train_example_dict.values()
+        self.test_example_list = self.test_example_dict.values()
+
+        train_count = len(self.train_example_dict)
+        test_count = len(self.test_example_dict)
+
+        if train_count + len(train_delete_examples) != train_old_count:
+            raise ValueError("deleted train data error")
+
+        if test_count + len(test_delete_examples) != test_old_count:
+            raise ValueError("deleted test data error")
+
+        print('deleted {} train examples'.format(len(train_delete_examples)))
+        print('deleted {} test examples'.format(len(test_delete_examples)))
+
+        self.sent_distribute_count()
+
+    def show_pared_info(self):
+        print('the count of dep type:{}'.format(self.parse_info.dependency_count))
+        print('the max len of sentence_tokens:{}, correspond sent id:{}'.format(self.parse_info.max_sent_len,
+                                                                                self.parse_info.max_sent_id))
+        print('the average len of sentence_tokens:{}'.format(self.parse_info.avg_sent_len))
+        sent_len_table = self.parse_info.sent_len_table
         plt.bar(range(1, len(sent_len_table) + 1), sent_len_table)
         plt.title("sentence tokens length distribution")
         plt.show()
 
-    @staticmethod
-    def sent_distribute_count(corpus_obj):
-        def count_example_of_out_threshold(examples, threshold):
-            count_out = 0
-            for e in examples:
-                if (e.sentence1.len_of_tokens() > threshold) or (e.sentence2.len_of_tokens() > threshold):
-                    count_out += 1
-            return count_out
+    def __collect_examples_over_threshold__(self, examples, threshold):
+        result_examples = []
+        for e in examples:
+            if (e.sentence1.len_of_tokens() > threshold) or (e.sentence2.len_of_tokens() > threshold):
+                result_examples.append(e)
+        return result_examples
 
-        sent_len_table = corpus_obj.parse_info.sent_len_table
+    def sent_distribute_count(self):
+        sent_len_table = np.zeros(500, dtype=np.int)
+        for s in self.sentence_list:
+            sent_len_table[s.len_of_tokens()] += 1
+
         sent_count = sent_len_table.sum()
-        train_count = len(corpus_obj.train_example_list)
-        test_count = len(corpus_obj.test_example_list)
+        train_count = len(self.train_example_list)
+        test_count = len(self.test_example_list)
         print('count of sentence:{}'.format(sent_count))
         print('count of example:{}'.format(train_count + test_count))
         while(True):
@@ -300,9 +358,9 @@ class Qqp(base_corpus.Corpus):
             sent_temp = sent_len_table[:length_threshold + 1].sum()
             print('sentence: {}/{}, rate:{}'.format(sent_temp, sent_count-sent_temp, round(sent_temp/sent_count, 6)))
 
-            train_out_count = count_example_of_out_threshold(corpus_obj.train_example_list, length_threshold)
+            train_out_count = len(self.__collect_examples_over_threshold__(self.train_example_list, length_threshold))
 
-            test_out_count = count_example_of_out_threshold(corpus_obj.test_example_list, length_threshold)
+            test_out_count = len(self.__collect_examples_over_threshold__(self.test_example_list, length_threshold))
 
             print('train data: {}/{}, rate:{}'.format(train_count, train_out_count,
                                                       round((train_count-train_out_count)/train_count, 6)))

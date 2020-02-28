@@ -194,14 +194,12 @@ class LSSE(fr.Framework):
         for i, hidden_states in enumerate(last_hidden_states_batch):
             sent1_states = hidden_states[1:sep_index_batch[i]]
             sent2_states = hidden_states[sep_index_batch[i]+1: sep_index_batch[i]+1+sent2_len_batch[i]]
+
             if len(sent1_states) != sent1_len_batch[i] or len(sent2_states) != sent2_len_batch[i]:
-                # print("sentence input of bert not match the input of gcn max length")
-                if self.arg_dict["corpus"] != corpus.qqp.get_qqp_obj:
-                    raise ValueError
+                raise ValueError
+
             if len(sent1_states) + len(sent2_states) + 3 != attention_mask_batch[i].sum():
-                # print("sentence input of bert not match the input of gcn max length")
-                if self.arg_dict["corpus"] != corpus.qqp.get_qqp_obj:
-                    raise ValueError
+                raise ValueError
 
             sent1_states = data_tool.padding_tensor(sent1_states, self.arg_dict['max_sentence_length'], align_dir='left', dim=0)
             sent2_states = data_tool.padding_tensor(sent2_states, self.arg_dict['max_sentence_length'], align_dir='left', dim=0)
