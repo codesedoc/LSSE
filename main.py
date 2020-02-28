@@ -27,7 +27,6 @@ def create_arg_dict():
         'corpus': corpus.mrpc.get_mrpc_obj,
         'framework_name': "LSSE",
         'task_type': 'classification',
-        # 'max_sentence_length': 45,
         'seed': 1234
     }
     general_tool.setup_seed(arg_dict['seed'])
