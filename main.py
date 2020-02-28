@@ -24,7 +24,8 @@ def create_arg_dict():
         'regular_flag': False,
         'ues_gpu': -1,
         'repeat_train': True,
-        'corpus': corpus.mrpc.get_mrpc_obj,
+        'corpus': corpus.qqp.get_qqp_obj,
+        'max_sentence_length': 64,
         'framework_name': "LSSE",
         'task_type': 'classification',
         'seed': 1234
@@ -59,7 +60,8 @@ def run_hyperor():
 
 def main():
     # corpus.mrpc.get_mrpc_obj()
-    run_framework()
+    corpus.qqp.test()
+    # run_framework()
     # run_hyperor()
 
 

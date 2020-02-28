@@ -89,9 +89,9 @@ class ExampleManager:
             positive_part, negative_part = part_pair
             result[i] = positive_part.copy()
             result[i].extend(negative_part)
-            print([int(e.label) for e in result[i]])
+            # print([int(e.label) for e in result[i]])
             random.shuffle(result[i])
-            print([int(e.label) for e in result[i]])
+            # print([int(e.label) for e in result[i]])
         return result
 
 
@@ -153,9 +153,9 @@ class DataManager:
             valid_loader = self.create_loader(MyDateSet(valid_group.copy()), batch_size=batch_size, example_dict=self.corpus.train_example_dict)
             loader_tuple = (train_loader, valid_loader)
             # print('train_loader:{}  valid_loader:{}'.format(len(train_loader), len(valid_loader)))
-            self.check_data_loader_tuple(loader_tuple)
+            # self.check_data_loader_tuple(loader_tuple)
             result.append(loader_tuple)
-        self.check_data_loader_tuple_list(result)
+        # self.check_data_loader_tuple_list(result)
         return result
 
     def create_loader(self, data_set, drop_last=False, batch_size=2, shuffle=True, example_dict=None):
@@ -313,7 +313,12 @@ def align_mult_sentence_tokens(mult_sentence_tokens, max_sentence_len, unk_token
 def padding_tensor(tensor_, max_sentence_len, align_dir='left', dim=0):
     padding_len = max_sentence_len - len(tensor_)
     if padding_len < 0:
-        raise ValueError("padding max len smaller")
+        print("padding max len smaller")
+        indexes = [i for i in range(max_sentence_len)]
+        indexes = torch.LongTensor(indexes).to(tensor_.device)
+        tensor_ = tensor_.index_select(dim=dim, index=indexes)
+        return tensor_
+
     shape = torch.tensor(tensor_.size(), dtype=torch.int).tolist()
     shape[dim] = padding_len
     pad_tensor = torch.zeros(shape, dtype=tensor_.dtype, device=tensor_.device)

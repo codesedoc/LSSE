@@ -17,7 +17,7 @@ class Sentence:
         self.syntax_info = None
 
     def len_of_tokens(self):
-        return len(self.parse_info['words'])
+        return len(self.parse_info['words'].copy())
 
     def word_tokens(self):
         return self.parse_info['words'].copy()

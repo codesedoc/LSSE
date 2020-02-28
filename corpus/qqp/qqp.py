@@ -11,7 +11,7 @@ single_mrpc_obj = None
 
 
 class Qqp(base_corpus.Corpus):
-    data_path = ''
+    data_path = 'corpus/qqp'
 
     def __extra_examples_from_org_file__(self, org_file, des_filename):
         if file_tool.check_file(des_filename):
@@ -257,8 +257,8 @@ class Qqp(base_corpus.Corpus):
         self.create_examples()
         self.parse_sentences()
 
-        test_file = file_tool.connect_path('', 'test.tsv')
-        train_file = file_tool.connect_path('', 'train.tsv')
+        test_file = file_tool.connect_path(self.data_path, 'test.tsv')
+        train_file = file_tool.connect_path(self.data_path, 'train.tsv')
         self.__create_new_data_set__(self.train_example_list, train_file)
         self.__create_new_data_set__(self.test_example_list, test_file)
         print('sentence count:{}'.format(len(self.sentence_dict)))
@@ -278,17 +278,37 @@ class Qqp(base_corpus.Corpus):
 
     @staticmethod
     def sent_distribute_count(corpus_obj):
+        def count_example_of_out_threshold(examples, threshold):
+            count_out = 0
+            for e in examples:
+                if (e.sentence1.len_of_tokens() > threshold) or (e.sentence2.len_of_tokens() > threshold):
+                    count_out += 1
+            return count_out
+
         sent_len_table = corpus_obj.parse_info.sent_len_table
-        count = sent_len_table.sum()
-        print('count of sentence:{}'.format(count))
+        sent_count = sent_len_table.sum()
+        train_count = len(corpus_obj.train_example_list)
+        test_count = len(corpus_obj.test_example_list)
+        print('count of sentence:{}'.format(sent_count))
+        print('count of example:{}'.format(train_count + test_count))
         while(True):
             print('please input length threshold, "e" donate exit')
             length_threshold = input()
             if length_threshold == "e":
                 break
             length_threshold = int(length_threshold)
-            temp = sent_len_table[:length_threshold + 1].sum()
-            print('{}/{}, rate:{}'.format(temp, count-temp, round(temp/count, 6)))
+            sent_temp = sent_len_table[:length_threshold + 1].sum()
+            print('sentence: {}/{}, rate:{}'.format(sent_temp, sent_count-sent_temp, round(sent_temp/sent_count, 6)))
+
+            train_out_count = count_example_of_out_threshold(corpus_obj.train_example_list, length_threshold)
+
+            test_out_count = count_example_of_out_threshold(corpus_obj.test_example_list, length_threshold)
+
+            print('train data: {}/{}, rate:{}'.format(train_count, train_out_count,
+                                                      round((train_count-train_out_count)/train_count, 6)))
+
+            print('test data: {}/{}, rate:{}'.format(test_count, test_out_count,
+                                                     round(test_count-test_out_count/test_count, 6)))
 
 
 single_qqp_obj = None
@@ -298,7 +318,7 @@ def get_qqp_obj(force=False):
 
     global single_qqp_obj
     if force or (single_qqp_obj is None):
-        single_qqp_obj_file = file_tool.connect_path("", 'qqp_obj.pkl')
+        single_qqp_obj_file = file_tool.connect_path("corpus/qqp", 'qqp_obj.pkl')
         if file_tool.check_file(single_qqp_obj_file):
             single_qqp_obj = file_tool.load_data_pickle(single_qqp_obj_file)
         else:
