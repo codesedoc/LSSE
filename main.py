@@ -26,7 +26,7 @@ def create_arg_dict():
         'repeat_train': True,
         'corpus': corpus.mrpc.get_mrpc_obj,
         # 'max_sentence_length': 50,
-        'framework_name': "LSSE",
+        'framework_name': "SeE",
         'task_type': 'classification',
         'seed': 1234
     }
@@ -60,9 +60,9 @@ def run_hyperor():
 
 def main():
     # corpus.mrpc.get_mrpc_obj()
-    corpus.qqp.test()
+    # corpus.qqp.test()
     # run_framework()
-    # run_hyperor()
+    run_hyperor()
 
 
 def occupy_gpu():

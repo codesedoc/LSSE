@@ -12,6 +12,11 @@ single_mrpc_obj = None
 
 
 class Qqp(base_corpus.Corpus):
+    def __init__(self):
+        self.max_sent_len = 0
+        super().__init__()
+
+
     data_path = 'corpus/qqp'
 
     def __extra_examples_from_org_file__(self, org_file, des_filename):
@@ -238,6 +243,7 @@ class Qqp(base_corpus.Corpus):
 
         self.parse_info = parser_tool.process_parsing_sentence_dict(parsed_sentence_dict, modify_dep_name=True)
         numeral_sentence_dict = self.parse_info.numeral_sentence_dict
+        self.max_sent_len = self.parse_info.max_sent_len
 
         if not general_tool.compare_two_dict_keys(self.sentence_dict.copy(), numeral_sentence_dict.copy()):
             raise ValueError("numeral_sentence_dict not march sentence_dict")
@@ -322,7 +328,11 @@ class Qqp(base_corpus.Corpus):
         print('deleted {} train examples'.format(len(train_delete_examples)))
         print('deleted {} test examples'.format(len(test_delete_examples)))
 
+        self.max_sent_len = threshold
         self.sent_distribute_count()
+
+    def get_max_sent_len(self):
+        return self.max_sent_len
 
     def show_pared_info(self):
         print('the count of dep type:{}'.format(self.parse_info.dependency_count))
