@@ -60,8 +60,8 @@ def run_hyperor():
 
 def main():
     # corpus.mrpc.get_mrpc_obj()
-    # corpus.qqp.test()
-    run_framework()
+    corpus.qqp.test()
+    # run_framework()
     # run_hyperor()
 
 

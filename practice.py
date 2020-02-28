@@ -23,26 +23,26 @@ import numpy as np
 # print(s1.strip()+s2)
 # print(s1.strip('xs')+s2)
 
-x = torch.tensor([-1, 2, -3]*3)
-y = torch.abs_(x)
-if torch.isnan(y).sum()>0:
-    print(x)
+# x = torch.tensor([-1, 2, -3]*3)
+# y = torch.abs_(x)
+# if torch.isnan(y).sum()>0:
+#     print(x)
 # # y[0] = 10
-print(y)
+# print(y)
+# #
+# print(x)
 #
-print(x)
-
-c = np.array(y.detach().numpy())
-# c = y.detach().numpy()
-# c = y.detach().numpy()
-c [1:5] =0
-print(c)
-k = torch.tensor([1.3]).item()
-print(y)
+# c = np.array(y.detach().numpy())
+# # c = y.detach().numpy()
+# # c = y.detach().numpy()
+# c [1:5] =0
+# print(c)
+# k = torch.tensor([1.3]).item()
+# print(y)
+# #
+# print(x)
 #
-print(x)
-
-torch.optim.lr_scheduler.LambdaLR
+# torch.optim.lr_scheduler.LambdaLR
 #
 #
 # c[0] = 0
@@ -61,3 +61,17 @@ torch.optim.lr_scheduler.LambdaLR
 #
 #
 # out.sum().backward()
+class c:
+    value =1
+    pass
+x =dict({1:[2],2:5,4:c()})
+t = list(x.values())
+print(x[4])
+print(t[2])
+print(x[4].value)
+print(t[2].value)
+t[2].value = 0
+print(x[4].value)
+print(t[2].value)
+
+pass

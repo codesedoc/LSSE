@@ -244,7 +244,6 @@ class Qqp(base_corpus.Corpus):
 
         for sent_id in self.sentence_dict.keys():
             self.sentence_dict[sent_id].syntax_info = numeral_sentence_dict[sent_id]
-
         pass
 
     def __create_new_data_set__(self, example_list, filename):
@@ -258,21 +257,20 @@ class Qqp(base_corpus.Corpus):
         self.create_examples()
         self.parse_sentences()
 
-        print('{}'.format(['*'] * 80))
+        print('{}'.format('*' * 80))
         print('finished load orig data and create objects')
         print('sentence count:{}'.format(len(self.sentence_dict)))
         print('train example count:{}'.format(len(self.train_example_dict.keys())))
         print('test example count:{}'.format(len(self.test_example_dict.keys())))
-        print('{}'.format(['*'] * 80), end='\n\n')
+        print('{}'.format('*' * 80), end='\n\n')
 
         self.modify_data()
         self.save_data()
-        
-    def modify_data(self):
-        print("Whether deleted examples with too long sentence, y/n?")
-        delete_flag = input()
 
+    def modify_data(self):
         while(True):
+            print("Whether deleted examples with too long sentence, y/n?")
+            delete_flag = input()
             if delete_flag == 'y':
                 self.__delete_examples_by_sent_len_threshold__(50)
             elif delete_flag == 'n':
@@ -288,7 +286,7 @@ class Qqp(base_corpus.Corpus):
         def delete_examples_from_dict(example_dict, example_ids):
             deleted_es = []
             for e_id in example_ids:
-                deleted_es = example_dict.pop(str(e_id))
+                deleted_es.append(example_dict.pop(str(e_id)))
             print("deleted {} examples".format(len(deleted_es)))
             return example_dict
 
@@ -305,8 +303,8 @@ class Qqp(base_corpus.Corpus):
         delete_examples_from_dict(self.train_example_dict, [e.id for e in train_delete_examples])
         delete_examples_from_dict(self.test_example_dict, [e.id for e in test_delete_examples])
 
-        self.train_example_list = self.train_example_dict.values()
-        self.test_example_list = self.test_example_dict.values()
+        self.train_example_list = list(self.train_example_dict.values())
+        self.test_example_list = list(self.test_example_dict.values())
 
         train_count = len(self.train_example_dict)
         test_count = len(self.test_example_dict)
@@ -316,6 +314,10 @@ class Qqp(base_corpus.Corpus):
 
         if test_count + len(test_delete_examples) != test_old_count:
             raise ValueError("deleted test data error")
+
+        for e_id in self.test_example_dict.keys():
+            if e_id in self.train_example_dict:
+                raise ValueError("example {} in both test and train".format(e_id))
 
         print('deleted {} train examples'.format(len(train_delete_examples)))
         print('deleted {} test examples'.format(len(test_delete_examples)))
@@ -354,6 +356,9 @@ class Qqp(base_corpus.Corpus):
             length_threshold = input()
             if length_threshold == "e":
                 break
+            if not general_tool.is_number(length_threshold):
+                continue
+
             length_threshold = int(length_threshold)
             sent_temp = sent_len_table[:length_threshold + 1].sum()
             print('sentence: {}/{}, rate:{}'.format(sent_temp, sent_count-sent_temp, round(sent_temp/sent_count, 6)))
@@ -366,7 +371,7 @@ class Qqp(base_corpus.Corpus):
                                                       round((train_count-train_out_count)/train_count, 6)))
 
             print('test data: {}/{}, rate:{}'.format(test_count, test_out_count,
-                                                     round(test_count-test_out_count/test_count, 6)))
+                                                     round((test_count-test_out_count)/test_count, 6)))
 
 
 single_qqp_obj = None
@@ -389,8 +394,8 @@ def get_qqp_obj(force=False):
 def test():
     start = time.time()
     qqp = get_qqp_obj()
-    Qqp.show_pared_info(qqp)
-    Qqp.sent_distribute_count(qqp)
+    # Qqp.show_pared_info(qqp)
+    qqp.sent_distribute_count()
     end = time.time()
     print(end-start)
     # qqp = get_qqp_obj()
