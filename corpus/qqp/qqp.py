@@ -340,6 +340,7 @@ class Qqp(base_corpus.Corpus):
                                                                                 self.parse_info.max_sent_id))
         print('the average len of sentence_tokens:{}'.format(self.parse_info.avg_sent_len))
         sent_len_table = self.parse_info.sent_len_table
+        file_tool.save_data_pickle(sent_len_table, file_tool.connect_path(self.data_path, "sent_len_table.pkl"))
         plt.bar(range(1, len(sent_len_table) + 1), sent_len_table)
         plt.title("sentence tokens length distribution")
         plt.show()
@@ -401,15 +402,25 @@ def get_qqp_obj(force=False):
     return single_qqp_obj
 
 
+def show_sent_len_distribute():
+    sent_len_table = file_tool.load_data_pickle(file_tool.connect_path(Qqp.data_path, 'sent_len_table.pkl'))
+    plt.bar(range(1, len(sent_len_table) + 1), sent_len_table)
+    plt.title("")
+    plt.xlabel('sentence length')
+    plt.ylabel('count')
+    plt.xlim(0, 80)
+    plt.show()
+
 def test():
-    start = time.time()
-    qqp = get_qqp_obj()
+    # start = time.time()
+    # qqp = get_qqp_obj()
     # Qqp.show_pared_info(qqp)
-    qqp.sent_distribute_count()
-    end = time.time()
-    print(end-start)
+    # qqp.sent_distribute_count()
+    # end = time.time()
+    # print(end-start)
     # qqp = get_qqp_obj()
     # qqp = get_qqp_obj()
+    show_sent_len_distribute()
 
 if __name__ == '__main__':
     test()

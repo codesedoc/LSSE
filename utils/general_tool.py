@@ -80,6 +80,34 @@ def is_number(s):
     return False
 
 
+def covert_transformer_tokens_to_words(corpus_obj, tokenizer_name,  result_file):
+    tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', tokenizer_name)
+    sentence_dict = corpus_obj.sentence_dict
+    words_dict = {}
+    for sent_id, sentence in sentence_dict.values():
+        inputs_ls_cased = tokenizer.encode_plus(sentence.original_sentence())
+        input_ids = inputs_ls_cased["input_ids"]
+        revised_tokens = tokenizer.convert_ids_to_tokens(input_ids)
+        words = []
+        word_piece_label = False
+        word_piece_list = []
+        for token in revised_tokens:
+            if token.startswith('##'):
+                word_piece_list.append(token[2:])
+                word_piece_label = True
+            else:
+                if word_piece_label:
+                    if len(word_piece_list) == 0:
+                        raise ValueError
+                    words.append(''.join(word_piece_list))
+                    word_piece_list.clear()
+                else:
+                    words.append(token)
+                word_piece_label = False
+
+        words_dict[sent_id] = words
+    pass
+
 def test():
     result1 = get_global_position_encodings(10, 6)
     # result2 = get_sinusoid_encoding_table(10, 6)

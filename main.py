@@ -5,6 +5,8 @@ import utils.hyperor as hyperor
 import utils.general_tool as general_tool
 import torch
 import logging
+import analysis.error_analysis as er_analysis
+import analysis.mrpc_analysis as mrpc_analysis
 
 
 def create_arg_dict():
@@ -20,7 +22,7 @@ def create_arg_dict():
         'max_steps': -1,
         'gcn_layer': 2,
         'position_encoding': True,
-        'dropout': 0.4,
+        'dropout': 1,
         'regular_flag': False,
         'ues_gpu': -1,
         'repeat_train': True,
@@ -61,9 +63,10 @@ def run_hyperor():
 def main():
     # corpus.mrpc.get_mrpc_obj()
     # corpus.qqp.test()
-    run_framework()
+    # run_framework()
     # run_hyperor()
-
+    # er_analysis.test()
+    mrpc_analysis.test()
 
 def occupy_gpu():
     memory = []
@@ -81,7 +84,7 @@ if __name__ == '__main__':
         main()
     except Exception as e:
         logging.exception(e)
-        memory = occupy_gpu()
-        while(True): pass
+        # memory = occupy_gpu()
+        # while(True): pass
 
     pass
