@@ -61,12 +61,16 @@ def run_hyperor():
 
 
 def main():
-    # corpus.mrpc.get_mrpc_obj()
+    # mrpc_obj = corpus.mrpc.get_mrpc_obj()
+    # tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
+    # general_tool.covert_transformer_tokens_to_words(mrpc_obj, tokenizer,
+    #                                                 'corpus/mrpc/sentence_words(bert-base-cased).txt',
+    #                                                 '##')
     # corpus.qqp.test()
-    # run_framework()
+    run_framework()
     # run_hyperor()
     # er_analysis.test()
-    mrpc_analysis.test()
+    # mrpc_analysis.test()
 
 def occupy_gpu():
     memory = []

@@ -31,6 +31,9 @@ class Sentence:
     def original_sentence(self):
         return self.original
 
+    def sentence_with_root_head(self):
+        return 'root ' + self.original
+
     def original_sentence_uncased(self):
         return self.original.lower()
 

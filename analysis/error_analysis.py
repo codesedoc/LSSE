@@ -60,6 +60,13 @@ class ErrorAnalyser:
 
         file_tool.save_list_data(save_data, filename, 'w')
 
+    def __get_U_multi_V__(self, dictU, dictV):
+        result = {}
+        for key in dictU.keys():
+            if key in dictV:
+                result[key] = dictU[key]
+        return result
+
     def create_difference_file_between_our_and_others(self):
         result_path = 'analysis/result'
         for other_error in self.others_error:
@@ -70,6 +77,31 @@ class ErrorAnalyser:
             self.__create_exampleU_sub_exampeV_file__(self.our_error.fn_example_dict, other_error.fn_example_dict, fn_result_file)
             self.__create_exampleU_sub_exampeV_file__(self.our_error.fp_example_dict, other_error.fp_example_dict,
                                                       fp_result_file)
+
+    def create_error_example_appear_in_all_method(self):
+        def save_example_dict(example_dict,filename):
+            save_data = ['total of examples: {}'.format(len(example_dict))]
+            for key in example_dict.keys():
+                save_data.append(key)
+                save_data.append(example_dict[key]['s1'])
+                save_data.append(example_dict[key]['s2'])
+            file_tool.save_list_data(save_data, filename, 'w')
+
+
+        result_path = 'analysis/result/both_error'
+        file_tool.makedir(result_path)
+        fn_example_dict = self.our_error.fn_example_dict
+        fn_path = file_tool.connect_path(result_path, 'fn.txt')
+        for other_error in self.others_error:
+            fn_example_dict = self.__get_U_multi_V__(fn_example_dict, other_error.fn_example_dict)
+
+        fp_example_dict = self.our_error.fp_example_dict
+        fp_path = file_tool.connect_path(result_path, 'fp.txt')
+        for other_error in self.others_error:
+            fp_example_dict = self.__get_U_multi_V__(fp_example_dict, other_error.fp_example_dict)
+
+        save_example_dict(fn_example_dict, fn_path)
+        save_example_dict(fp_example_dict, fp_path)
 
 
 def test():
@@ -84,3 +116,4 @@ def test():
     ]
     error_analyer = ErrorAnalyser(our_error_info, others_error_info)
     error_analyer.create_difference_file_between_our_and_others()
+    error_analyer.create_error_example_appear_in_all_method()

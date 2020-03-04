@@ -118,7 +118,8 @@ class Mrpc(base_corpus.Corpus):
             file_tool.save_data_pickle(parsed_sentence_dict, parsed_sentence_dict_file)
 
         if len(parsed_sentence_dict) != len(self.sentence_dict):
-            raise ValueError("parsed_sentence_dict not march sentence_dict")
+            # raise ValueError("parsed_sentence_dict not march sentence_dict")
+            pass
 
         if not general_tool.compare_two_dict_keys(self.sentence_dict.copy(), parsed_sentence_dict.copy()):
             raise ValueError("parsed_sentence_dict not march sentence_dict")

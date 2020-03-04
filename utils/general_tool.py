@@ -2,6 +2,7 @@ import math
 import numpy as np
 import torch
 import random
+import utils.file_tool as file_tool
 
 
 def compare_two_dict_keys(dict1, dict2):
@@ -80,20 +81,63 @@ def is_number(s):
     return False
 
 
-def covert_transformer_tokens_to_words(corpus_obj, tokenizer_name,  result_file):
-    tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', tokenizer_name)
+def word_piece_flag_list(revised_tokens, split_signal):
+    flag_list = np.zeros(len(revised_tokens), dtype=np.int)
+    range_list = []
+    start = -1
+    end = -1
+    word_piece_label = False
+    for i, token in enumerate(revised_tokens):
+        token = token.strip()
+        if len(token) == 0:
+            raise ValueError
+        if token.startswith(split_signal):
+            if i <= 0:
+                raise ValueError
+            if not word_piece_label:
+                start = i-1
+            word_piece_label = True
+        else:
+            end = i
+            if word_piece_label:
+                if end < start+1:
+                    raise ValueError
+                range_list.append((start, end))
+
+            word_piece_label = False
+    for range_ in range_list:
+        for i in range(range_[0], range_[1]):
+            flag_list[i] = 1
+    return flag_list
+
+
+def covert_transformer_tokens_to_words(corpus_obj, tokenizer,  result_file, split_signal):
     sentence_dict = corpus_obj.sentence_dict
     words_dict = {}
-    for sent_id, sentence in sentence_dict.values():
+    for sent_id, sentence in sentence_dict.items():
         inputs_ls_cased = tokenizer.encode_plus(sentence.original_sentence())
         input_ids = inputs_ls_cased["input_ids"]
         revised_tokens = tokenizer.convert_ids_to_tokens(input_ids)
+
+        piece_flag_list = word_piece_flag_list(revised_tokens[1:-1].copy(), split_signal)
+
+        words_temp = revised_tokens[1:-1].copy()
+        for i, token in enumerate(words_temp):
+            token = token.strip()
+            if len(token) == 0:
+                raise ValueError
+            if token.startswith(split_signal):
+                words_temp[i] = token[2:]
+
+        if len(piece_flag_list) != len(words_temp):
+            raise ValueError
+
         words = []
         word_piece_label = False
         word_piece_list = []
-        for token in revised_tokens:
-            if token.startswith('##'):
-                word_piece_list.append(token[2:])
+        for i, flag in enumerate(piece_flag_list):
+            if flag == 1:
+                word_piece_list.append(words_temp[i])
                 word_piece_label = True
             else:
                 if word_piece_label:
@@ -101,12 +145,54 @@ def covert_transformer_tokens_to_words(corpus_obj, tokenizer_name,  result_file)
                         raise ValueError
                     words.append(''.join(word_piece_list))
                     word_piece_list.clear()
-                else:
-                    words.append(token)
+
+                words.append(words_temp[i])
                 word_piece_label = False
 
         words_dict[sent_id] = words
+
+    save_data = []
+    for sent_id, words in words_dict.items():
+        save_data.append(sent_id + '\t' + ' '.join(words))
+    file_tool.save_list_data(save_data, result_file, 'w')
     pass
+
+# def covert_transformer_tokens_to_words(corpus_obj, tokenizer,  result_file, split_signal):
+#     sentence_dict = corpus_obj.sentence_dict
+#     words_dict = {}
+#     for sent_id, sentence in sentence_dict.items():
+#         inputs_ls_cased = tokenizer.encode_plus(sentence.original_sentence())
+#         input_ids = inputs_ls_cased["input_ids"]
+#         revised_tokens = tokenizer.convert_ids_to_tokens(input_ids)
+#         words = []
+#         word_piece_label = False
+#         word_piece_list = []
+#         for token in revised_tokens[1:-1]:
+#             token = token.strip()
+#             if len(token) == 0:
+#                 raise ValueError
+#             if token.startswith(split_signal):
+#                 word_piece_list.append(token[2:])
+#                 word_piece_label = True
+#             else:
+#                 if word_piece_label:
+#                     if len(word_piece_list) == 0:
+#                         raise ValueError
+#                     if len(words) == 0:
+#                         raise ValueError
+#                     word_temp = words.pop()
+#                     words.append(word_temp + ''.join(word_piece_list))
+#                     word_piece_list.clear()
+#                 else:
+#                     words.append(token)
+#                 word_piece_label = False
+#
+#         words_dict[sent_id] = words
+#     save_data = []
+#     for sent_id, words in words_dict.items():
+#         save_data.append(sent_id + '\t' + ' '.join(words))
+#     file_tool.save_list_data(save_data, result_file, 'w')
+#     pass
 
 def test():
     result1 = get_global_position_encodings(10, 6)
