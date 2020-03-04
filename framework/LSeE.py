@@ -66,6 +66,7 @@ class LSeE(fr.Framework):
         sentence_max_len = self.arg_dict['sentence_max_len_for_bert']
         pad_on_right = self.arg_dict['pad_on_right']
         pad_token = self.bert.tokenizer.convert_tokens_to_ids([self.bert.tokenizer.pad_token])[0]
+        sep_token = self.bert.tokenizer.convert_tokens_to_ids([self.bert.tokenizer.sep_token])[0]
         mask_padding_with_zero = True
         pad_token_segment_id = 0
 
@@ -80,12 +81,17 @@ class LSeE(fr.Framework):
         sep_index_batch = []
         sent1_len_batch = []
         sent2_len_batch = []
-
+        sent1_org_len_batch = []
+        sent2_org_len_batch = []
+        word_piece_flags_batch = []
         for s1, s2 in zip(sentence1s, sentence2s):
-            inputs_ls_cased = self.bert.tokenizer.encode_plus(s1.word_tokens(), s2.word_tokens(),
+            inputs_ls_cased = self.bert.tokenizer.encode_plus(s1.sentence_with_root_head(), s2.sentence_with_root_head(),
                                                               add_special_tokens=True,
                                                               max_length=sentence_max_len, )
             input_ids, token_type_ids = inputs_ls_cased["input_ids"], inputs_ls_cased["token_type_ids"]
+
+            word_piece_flags_batch.append(
+                general_tool.word_piece_flag_list(self.bert.tokenizer.convert_ids_to_tokens(input_ids), '##'))
 
             attention_mask = [1 if mask_padding_with_zero else 0] * len(input_ids)
 
@@ -102,9 +108,23 @@ class LSeE(fr.Framework):
             input_ids_batch.append(input_ids)
             token_type_ids_batch.append(token_type_ids)
             attention_mask_batch.append(attention_mask)
-            sep_index_batch.append(len(s1.word_tokens()) + 1)
-            sent1_len_batch.append(len(s1.word_tokens()))
-            sent2_len_batch.append(len(s2.word_tokens()))
+
+            sep_indexes = []
+
+            for sep_index, id_ in enumerate(input_ids.copy()):
+                if id_ == sep_token:
+                    sep_indexes.append(sep_index)
+
+            if len(sep_indexes) != 2:
+                raise ValueError
+
+            sep_index_batch.append(sep_indexes[0])
+            sent1_len_batch.append(sep_indexes[0] - 1)
+            sent2_len_batch.append(sep_indexes[1] - sep_indexes[0] - 1)
+
+            sent1_org_len_batch.append(s1.len_of_tokens())
+            sent2_org_len_batch.append(s2.len_of_tokens())
+
 
         input_ids_batch = torch.tensor(input_ids_batch, device=self.device)
         token_type_ids_batch = torch.tensor(token_type_ids_batch, device=self.device)
@@ -116,21 +136,50 @@ class LSeE(fr.Framework):
             'attention_mask_batch': attention_mask_batch,
             'sep_index_batch': sep_index_batch,
             'sent1_len_batch': sent1_len_batch,
+            'sent1_org_len_batch': sent1_org_len_batch,
+            'word_piece_flags_batch': word_piece_flags_batch,
             'sent2_len_batch': sent2_len_batch,
+            'sent2_org_len_batch': sent2_org_len_batch,
             'labels': labels
         }
         return result
 
+    def merge_reps_of_word_pieces(self, word_piece_flags, token_reps):
+        result_reps = []
+        word_piece_label = False
+        word_piece_rep = 0
+        word_piece_count = 0
+        for i, flag in enumerate(word_piece_flags):
+            if flag == 1:
+                word_piece_rep += token_reps[i]
+                word_piece_count += 1
+                word_piece_label = True
+            else:
+                if word_piece_label:
+                    if word_piece_count == 0:
+                        raise ValueError
+                    result_reps.append(word_piece_rep/word_piece_count)
+                    word_piece_rep = 0
+                    word_piece_count = 0
+                result_reps.append(token_reps[i])
+                word_piece_label = False
+        result_reps = torch.stack(result_reps, dim=0)
+        return result_reps
+
     def forward(self, *input_data, **kwargs):
-        if len(kwargs) > 0: # common run or visualization
+        if len(kwargs) > 0:  # common run or visualization
             data_batch = kwargs
             input_ids_batch = data_batch['input_ids_batch']
             token_type_ids_batch = data_batch['token_type_ids_batch']
             attention_mask_batch = data_batch['attention_mask_batch']
             sep_index_batch = data_batch['sep_index_batch']
+            word_piece_flags_batch = data_batch['word_piece_flags_batch']
             sent1_len_batch = data_batch['sent1_len_batch']
             sent2_len_batch = data_batch['sent2_len_batch']
             labels = data_batch['labels']
+
+            sent1_org_len_batch = data_batch['sent1_org_len_batch']
+            sent2_org_len_batch = data_batch['sent2_org_len_batch']
 
         else:
             input_ids_batch, token_type_ids_batch, attention_mask_batch, sep_index_batch, sent1_len_batch, \
@@ -142,14 +191,37 @@ class LSeE(fr.Framework):
         sent1_states_batch = []
         sent2_states_batch = []
         for i, hidden_states in enumerate(last_hidden_states_batch):
+            sent1_word_piece_flags = word_piece_flags_batch[i][1:sep_index_batch[i]]
             sent1_states = hidden_states[1:sep_index_batch[i]]
-            sent2_states = hidden_states[sep_index_batch[i]+1: sep_index_batch[i]+1+sent2_len_batch[i]]
+
+            sent2_word_piece_flags = word_piece_flags_batch[i][
+                                     sep_index_batch[i] + 1: sep_index_batch[i] + 1 + sent2_len_batch[i]]
+            sent2_states = hidden_states[sep_index_batch[i] + 1: sep_index_batch[i] + 1 + sent2_len_batch[i]]
+
             if len(sent1_states) != sent1_len_batch[i] or len(sent2_states) != sent2_len_batch[i]:
                 raise ValueError
+
             if len(sent1_states) + len(sent2_states) + 3 != attention_mask_batch[i].sum():
                 raise ValueError
-            sent1_states = data_tool.padding_tensor(sent1_states, self.arg_dict['max_sentence_length'], align_dir='left', dim=0)
-            sent2_states = data_tool.padding_tensor(sent2_states, self.arg_dict['max_sentence_length'], align_dir='left', dim=0)
+
+            if len(word_piece_flags_batch[i]) != attention_mask_batch[i].sum():
+                raise ValueError
+
+            sent1_states = self.merge_reps_of_word_pieces(sent1_word_piece_flags, sent1_states)
+
+            if len(sent1_states) != sent1_org_len_batch[i]:
+                raise ValueError
+
+            sent1_states = data_tool.padding_tensor(sent1_states, self.arg_dict['max_sentence_length'],
+                                                    align_dir='left', dim=0)
+
+            sent2_states = self.merge_reps_of_word_pieces(sent2_word_piece_flags, sent2_states)
+
+            if len(sent2_states) != sent2_org_len_batch[i]:
+                raise ValueError
+
+            sent2_states = data_tool.padding_tensor(sent2_states, self.arg_dict['max_sentence_length'],
+                                                    align_dir='left', dim=0)
             sent1_states_batch.append(sent1_states)
             sent2_states_batch.append(sent2_states)
 

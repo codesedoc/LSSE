@@ -150,7 +150,7 @@ class LSSE(fr.Framework):
 
             sep_indexes = []
 
-            for sep_index, id_ in enumerate(input_ids):
+            for sep_index, id_ in enumerate(input_ids.copy()):
                 if id_ == sep_token:
                     sep_indexes.append(sep_index)
 

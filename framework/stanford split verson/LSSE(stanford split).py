@@ -130,6 +130,7 @@ class LSSE(fr.Framework):
             attention_mask = [1 if mask_padding_with_zero else 0] * len(input_ids)
 
             padding_length = sentence_max_len - len(input_ids)
+
             if not pad_on_right:
                 input_ids = ([pad_token] * padding_length) + input_ids
                 attention_mask = ([0 if mask_padding_with_zero else 1] * padding_length) + attention_mask

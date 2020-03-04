@@ -21,7 +21,7 @@ def create_arg_dict():
         'warmup_steps': 0,
         'max_steps': -1,
         'gcn_layer': 2,
-        'position_encoding': True,
+        'position_encoding': False,
         'dropout': 1,
         'regular_flag': False,
         'ues_gpu': -1,
