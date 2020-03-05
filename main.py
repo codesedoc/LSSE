@@ -28,7 +28,7 @@ def create_arg_dict():
         'repeat_train': True,
         'corpus': corpus.qqp.get_qqp_obj,
         # 'max_sentence_length': 50,
-        'framework_name': "LSSE",
+        'framework_name': "LE",
         'task_type': 'classification',
         'seed': 1234
     }

@@ -84,6 +84,7 @@ class LSeE(fr.Framework):
         sent1_org_len_batch = []
         sent2_org_len_batch = []
         word_piece_flags_batch = []
+        sent1_id_batch = []
         for s1, s2 in zip(sentence1s, sentence2s):
             inputs_ls_cased = self.bert.tokenizer.encode_plus(s1.sentence_with_root_head(), s2.sentence_with_root_head(),
                                                               add_special_tokens=True,
@@ -125,6 +126,7 @@ class LSeE(fr.Framework):
             sent1_org_len_batch.append(s1.len_of_tokens())
             sent2_org_len_batch.append(s2.len_of_tokens())
 
+            sent1_id_batch.append(s1.id)
 
         input_ids_batch = torch.tensor(input_ids_batch, device=self.device)
         token_type_ids_batch = torch.tensor(token_type_ids_batch, device=self.device)
@@ -140,7 +142,9 @@ class LSeE(fr.Framework):
             'word_piece_flags_batch': word_piece_flags_batch,
             'sent2_len_batch': sent2_len_batch,
             'sent2_org_len_batch': sent2_org_len_batch,
-            'labels': labels
+            'labels': labels,
+
+            'sent1_id_batch': sent1_id_batch
         }
         return result
 
