@@ -124,6 +124,7 @@ class LSSE(fr.Framework):
         word_piece_flags_batch = []
         sent1_org_len_batch = []
         sent2_org_len_batch = []
+        sent1_id_batch = []
         for s1, s2 in zip(sentence1s, sentence2s):
             inputs_ls_cased = self.bert.tokenizer.encode_plus(s1.sentence_with_root_head(), s2.sentence_with_root_head(),
                                                                   add_special_tokens=True,
@@ -163,6 +164,7 @@ class LSSE(fr.Framework):
 
             sent1_org_len_batch.append(s1.len_of_tokens())
             sent2_org_len_batch.append(s2.len_of_tokens())
+            sent1_id_batch.append(s1.id)
 
         input_ids_batch = torch.tensor(input_ids_batch, device=self.device)
         token_type_ids_batch = torch.tensor(token_type_ids_batch, device=self.device)
@@ -186,7 +188,9 @@ class LSSE(fr.Framework):
             'sent2_len_batch': sent2_len_batch,
             'adj_matrix2_batch': adj_matrix2_batch,
 
-            'labels': labels
+            'labels': labels,
+
+            'sent1_id_batch': sent1_id_batch
         }
         return result
 
@@ -209,6 +213,10 @@ class LSSE(fr.Framework):
                     word_piece_count = 0
                 result_reps.append(token_reps[i])
                 word_piece_label = False
+
+        if word_piece_label and (word_piece_count > 0):
+            result_reps.append(word_piece_rep / word_piece_count)
+
         result_reps = torch.stack(result_reps, dim=0)
         return result_reps
 
@@ -254,7 +262,7 @@ class LSSE(fr.Framework):
 
             if len(word_piece_flags_batch[i]) != attention_mask_batch[i].sum():
                 raise ValueError
-
+            sent1_states_temp = torch.tensor(sent1_states)
             sent1_states = self.merge_reps_of_word_pieces(sent1_word_piece_flags, sent1_states)
 
             if len(sent1_states) != sent1_org_len_batch[i]:

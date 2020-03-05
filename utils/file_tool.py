@@ -22,11 +22,12 @@ def save_data(data, file_name, model):
         f.write(data)
 
 
-def save_list_data(data, file_name, model):
+def save_list_data(data, file_name, model, need_new_line=True):
     with open(file_name, model) as f:
         for d in data:
             f.write(d)
-            f.write('\n')
+            if need_new_line:
+                f.write('\n')
 
 
 def save_data_pickle(data, file_name):

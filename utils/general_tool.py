@@ -105,6 +105,9 @@ def word_piece_flag_list(revised_tokens, split_signal):
                 range_list.append((start, end))
 
             word_piece_label = False
+    if word_piece_label:
+        range_list.append((start, len(revised_tokens)))
+
     for range_ in range_list:
         for i in range(range_[0], range_[1]):
             flag_list[i] = 1
@@ -114,6 +117,7 @@ def word_piece_flag_list(revised_tokens, split_signal):
 def covert_transformer_tokens_to_words(corpus_obj, tokenizer,  result_file, split_signal):
     sentence_dict = corpus_obj.sentence_dict
     words_dict = {}
+    special_words_dict = {}
     for sent_id, sentence in sentence_dict.items():
         inputs_ls_cased = tokenizer.encode_plus(sentence.original_sentence())
         input_ids = inputs_ls_cased["input_ids"]
@@ -148,6 +152,9 @@ def covert_transformer_tokens_to_words(corpus_obj, tokenizer,  result_file, spli
 
                 words.append(words_temp[i])
                 word_piece_label = False
+        if word_piece_label and len(word_piece_list) > 0:
+            words.append(''.join(word_piece_list))
+            special_words_dict[sent_id] = words
 
         words_dict[sent_id] = words
 
@@ -155,6 +162,12 @@ def covert_transformer_tokens_to_words(corpus_obj, tokenizer,  result_file, spli
     for sent_id, words in words_dict.items():
         save_data.append(sent_id + '\t' + ' '.join(words))
     file_tool.save_list_data(save_data, result_file, 'w')
+
+    save_data = []
+    for sent_id, words in special_words_dict.items():
+        save_data.append(sent_id + '\t' + ' '.join(words))
+    file_tool.save_list_data(save_data, file_tool.PathManager.change_filename_by_append(result_file, 'special'), 'w')
+
     pass
 
 # def covert_transformer_tokens_to_words(corpus_obj, tokenizer,  result_file, split_signal):

@@ -278,7 +278,7 @@ class Qqp(base_corpus.Corpus):
             print("Whether deleted examples with too long sentence, y/n?")
             delete_flag = input()
             if delete_flag == 'y':
-                self.__delete_examples_by_sent_len_threshold__(50)
+                self.__delete_examples_by_sent_len_threshold__(60)
             elif delete_flag == 'n':
                 break
 

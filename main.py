@@ -21,12 +21,12 @@ def create_arg_dict():
         'warmup_steps': 0,
         'max_steps': -1,
         'gcn_layer': 2,
-        'position_encoding': False,
+        'position_encoding': True,
         'dropout': 1,
         'regular_flag': False,
         'ues_gpu': -1,
         'repeat_train': True,
-        'corpus': corpus.mrpc.get_mrpc_obj,
+        'corpus': corpus.qqp.get_qqp_obj,
         # 'max_sentence_length': 50,
         'framework_name': "LSSE",
         'task_type': 'classification',
@@ -65,6 +65,11 @@ def main():
     # tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
     # general_tool.covert_transformer_tokens_to_words(mrpc_obj, tokenizer,
     #                                                 'corpus/mrpc/sentence_words(bert-base-cased).txt',
+    #                                                 '##')
+    # qqp_obj = corpus.qqp.get_qqp_obj()
+    # tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
+    # general_tool.covert_transformer_tokens_to_words(qqp_obj, tokenizer,
+    #                                                 'corpus/qqp/sentence_words(bert-base-cased).txt',
     #                                                 '##')
     # corpus.qqp.test()
     run_framework()

@@ -12,7 +12,7 @@ class ParseInfo:
         self.dependency_dict = kwargs['dependency_dict']
         self.dependency_count = len(self.dependency_dict)
         self.id2dependency = kwargs['id2dependency']
-        self.sent_len_table = np.zeros(275, np.longlong)
+        self.sent_len_table = np.zeros(500, np.longlong)
         avg_sent_len = 0
         max_sent_len = 0
         max_sent_id = 0

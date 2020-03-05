@@ -163,6 +163,10 @@ class LSeE(fr.Framework):
                     word_piece_count = 0
                 result_reps.append(token_reps[i])
                 word_piece_label = False
+
+        if word_piece_label and (word_piece_count > 0):
+            result_reps.append(word_piece_rep / word_piece_count)
+
         result_reps = torch.stack(result_reps, dim=0)
         return result_reps
 
