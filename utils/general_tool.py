@@ -114,10 +114,43 @@ def word_piece_flag_list(revised_tokens, split_signal):
     return flag_list
 
 
+def calculate_the_max_len_of_tokens_split_by_bert(corpus_obj, tokenizer):
+    sentence_dict = corpus_obj.sentence_dict_from_examples()
+    max_len = 0
+    max_len_id = 0
+    # sentence_dict = {'233158': sentence_dict["233158"], '233159': sentence_dict["233159"]}
+    count = 0
+    input_is_list = []
+    for sent_id, sentence in sentence_dict.items():
+        inputs_ls_cased = tokenizer.encode_plus(sentence.sentence_with_root_head())
+        input_ids = inputs_ls_cased["input_ids"]
+        input_is_list.append(input_ids)
+        revised_tokens = tokenizer.convert_ids_to_tokens(input_ids)
+        if len(revised_tokens) >= 126:
+            count += 1
+        if len(revised_tokens) > max_len:
+            max_len = len(revised_tokens)
+            max_len_id = sent_id
+        # print(len(revised_tokens))
+    print("the_max_len_of_tokens_split_by_bert is {}, and id is {}".format(max_len, max_len_id))
+    print("the_count_of_the_len_larger_than_126 is {}".format(count))
+    # s1 = sentence_dict["233158"]
+    # s2 = sentence_dict["233159"]
+    # inputs_ls_cased = tokenizer.encode_plus(s1.sentence_with_root_head(), s2.sentence_with_root_head(),
+    #                                         add_special_tokens=True,
+    #                                         max_length=256,)
+    # input_ids, token_type_ids = inputs_ls_cased["input_ids"], inputs_ls_cased["token_type_ids"]
+
+    # piece_flag_list = word_piece_flag_list(tokenizer.convert_ids_to_tokens(input_ids), '##')
+
+    pass
+
+
 def covert_transformer_tokens_to_words(corpus_obj, tokenizer,  result_file, split_signal):
     sentence_dict = corpus_obj.sentence_dict
     words_dict = {}
     special_words_dict = {}
+    sentence_dict = {'233158': sentence_dict["233158"]}
     for sent_id, sentence in sentence_dict.items():
         inputs_ls_cased = tokenizer.encode_plus(sentence.original_sentence())
         input_ids = inputs_ls_cased["input_ids"]

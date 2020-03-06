@@ -264,7 +264,7 @@ class LSSE(fr.Framework):
 
             if len(word_piece_flags_batch[i]) != attention_mask_batch[i].sum():
                 raise ValueError
-            sent1_states_temp = torch.tensor(sent1_states)
+            # sent1_states_temp = torch.tensor(sent1_states)
             sent1_states = self.merge_reps_of_word_pieces(sent1_word_piece_flags, sent1_states)
 
             if len(sent1_states) != sent1_org_len_batch[i]:

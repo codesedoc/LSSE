@@ -384,6 +384,18 @@ class Qqp(base_corpus.Corpus):
             print('test data: {}/{}, rate:{}'.format(test_count, test_out_count,
                                                      round((test_count-test_out_count)/test_count, 6)))
 
+    def sentence_dict_from_examples(self):
+        sentence_dict = {}
+        for e in self.train_example_dict.values():
+            sentence_dict[e.sentence1.id] = e.sentence1
+            sentence_dict[e.sentence2.id] = e.sentence2
+
+        for e in self.test_example_dict.values():
+            sentence_dict[e.sentence1.id] = e.sentence1
+            sentence_dict[e.sentence2.id] = e.sentence2
+
+        return sentence_dict
+
 
 single_qqp_obj = None
 
