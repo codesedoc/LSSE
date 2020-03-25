@@ -28,7 +28,7 @@ def create_arg_dict():
         'repeat_train': True,
         'corpus': corpus.qqp.get_qqp_obj,
         # 'max_sentence_length': 50,
-        'framework_name': "LE",
+        'framework_name': "LSSE",
         'task_type': 'classification',
         'seed': 1234
     }
@@ -66,14 +66,14 @@ def main():
     # general_tool.covert_transformer_tokens_to_words(mrpc_obj, tokenizer,
     #                                                 'corpus/mrpc/sentence_words(bert-base-cased).txt',
     #                                                 '##')
-    qqp_obj = corpus.qqp.get_qqp_obj()
-    tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
+    # qqp_obj = corpus.qqp.get_qqp_obj()
+    # tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
     # general_tool.covert_transformer_tokens_to_words(qqp_obj, tokenizer,
     #                                                 'corpus/qqp/sentence_words(bert-base-cased).txt',
     #                                                 '##')
-    general_tool.calculate_the_max_len_of_tokens_split_by_bert(qqp_obj, tokenizer)
+    # general_tool.calculate_the_max_len_of_tokens_split_by_bert(qqp_obj, tokenizer)
     # corpus.qqp.test()
-    # run_framework()
+    run_framework()
     # run_hyperor()
     # er_analysis.test()
     # mrpc_analysis.test()
