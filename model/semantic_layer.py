@@ -1,5 +1,7 @@
 import torch
 import math
+import utils.wmd as wmd
+import numpy as np
 
 
 class SemanticLayer(torch.nn.Module):
@@ -13,7 +15,7 @@ class SemanticLayer(torch.nn.Module):
         tensor = tensor + flag_tensor * boundary
         return tensor
 
-    def forward(self, sentence1s, sentence2s):
+    def forward(self, sentence1s, sentence2s, sentence1_lens=None, sentence2_lens=None):
         sentence1s = sentence1s.float()
         sentence2s = sentence2s.float()
         if self.arg_dict['semantic_compare_func'] == 'l2':
@@ -21,6 +23,10 @@ class SemanticLayer(torch.nn.Module):
 
         elif self.arg_dict['semantic_compare_func'] == 'arccos':
             result = self.calculate_arc_cos(sentence1s, sentence2s)
+
+        elif self.arg_dict['semantic_compare_func'] == 'wmd':
+            result = self.word_mover_distance(sentence1s, sentence2s, sentence1_lens, sentence2_lens)
+
         else:
             raise ValueError
 
@@ -84,4 +90,35 @@ class SemanticLayer(torch.nn.Module):
             result.append(result_temp)
         result = torch.stack(result, dim=0)
 
+        return result
+
+    def word_mover_distance(self, sentence1s, sentence2s, sentence1_lens, sentence2_lens):
+        wmd_obj = wmd.WMD()
+        current_batch_size = len(sentence1s)
+        result_temp = torch.cdist(sentence1s, sentence2s, p=2)
+        result = []
+        for batch in range(current_batch_size):
+            sentence1 = sentence1s[batch]
+            sentence1_np = sentence1.detach().cpu().numpy().copy()[0:sentence1_lens[batch]]
+            sentence1_tokens = ["token1_{}".format(i+1) for i in range(sentence1_lens[batch])]
+
+            sentence2 = sentence2s[batch]
+            sentence2_np = sentence2.detach().cpu().numpy().copy()[0:sentence2_lens[batch]]
+            sentence2_tokens = ["token2_{}".format(i+1) for i in range(sentence2_lens[batch])]
+
+            wvmodel = {sentence1_tokens[i]: sentence1_np[i] for i in range(sentence1_lens[batch])}
+
+            wvmodel.update(
+                {sentence2_tokens[i]: sentence2_np[i] for i in range(sentence2_lens[batch])}
+            )
+
+            weight_matrix = np.zeros(result_temp[batch].size())
+            weight_matrix_temp = wmd_obj.trans_matrix(sentence1_tokens, sentence2_tokens, wvmodel)
+            shape = weight_matrix_temp.shape
+            weight_matrix[0:shape[0], 0:shape[1]] = weight_matrix_temp
+            result.append(result_temp[batch] * torch.from_numpy(weight_matrix).to(dtype=result_temp.dtype,
+                                                                                  device=result_temp.device))
+
+        result = torch.stack(result, dim=0)
+        result = result.reshape(current_batch_size, -1)
         return result

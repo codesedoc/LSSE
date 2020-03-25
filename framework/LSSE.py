@@ -9,6 +9,7 @@ import utils.general_tool as general_tool
 import utils.data_tool as data_tool
 from model import *
 import corpus
+import math
 
 
 class LSSE(fr.Framework):
@@ -27,7 +28,8 @@ class LSSE(fr.Framework):
     def create_arg_dict(self):
         arg_dict = {
             # 'sgd_momentum': 0.4,
-            'semantic_compare_func': 'l2',
+            # 'semantic_compare_func': 'l2',
+            'semantic_compare_func': 'wmd',
             'concatenate_input_for_gcn_hidden': True,
             'fully_scales': [768 * 2, 2],
             'position_encoding': True,
@@ -72,6 +74,9 @@ class LSSE(fr.Framework):
         if not file_tool.check_dir(model_dir):
             raise RuntimeError
         self.arg_dict['model_path'] = model_dir
+
+        if self.arg_dict['semantic_compare_func'] == 'wmd':
+            self.arg_dict['fully_scales'] = [self.arg_dict['max_sentence_length'] ** 2 + self.arg_dict['bert_hidden_dim'], 2]
 
     def init_weights(self, module):
         """ Initialize the weights """
@@ -308,7 +313,7 @@ class LSSE(fr.Framework):
         if self.arg_dict['concatenate_input_for_gcn_hidden']:
             gcn_out1 = torch.cat([gcn_out1, sent1_states_batch], dim=2)
             gcn_out2 = torch.cat([gcn_out2, sent2_states_batch], dim=2)
-        result = self.semantic_layer(gcn_out1, gcn_out2)
+        result = self.semantic_layer(gcn_out1, gcn_out2, sent1_org_len_batch, sent2_org_len_batch)
         result = torch.cat([pooled_output, result], dim=1)
 
         result = self.fully_connection(result)

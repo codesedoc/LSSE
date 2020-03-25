@@ -114,6 +114,7 @@ class FrameworkManager:
         arg_dict = self.arg_dict.copy()
         if 'max_sentence_length' not in arg_dict:
             arg_dict['max_sentence_length'] = self.data_manager.get_max_sent_len()
+
         arg_dict['dep_kind_count'] = self.data_manager.get_max_dep_type()
         frame_work = fr.frameworks[self.arg_dict['framework_name']]
         return frame_work(arg_dict)
