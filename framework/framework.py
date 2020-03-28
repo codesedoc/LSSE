@@ -19,6 +19,15 @@ class Framework(torch.nn.Module):
         for name in arg_dict:
             self.arg_dict[name] = arg_dict[name]
 
+        if self.arg_dict['semantic_compare_func'] == 'wmd':
+            self.arg_dict['fully_scales'] = [self.arg_dict['max_sentence_length'] ** 2 + self.arg_dict['bert_hidden_dim'], 2]
+
+        elif self.arg_dict['concatenate_input_for_gcn_hidden']:
+            self.arg_dict['fully_scales'][0] += self.arg_dict['gcn_hidden_dim']
+
+        if self.arg_dict['task_type'] == 'regression':
+            self.arg_dict['fully_scales'][-1] = 1
+
     def print_arg_dict(self):
         print("*"*80)
         print("framework args")

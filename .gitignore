@@ -22,4 +22,5 @@ result/visualization
 /**/*.pkls
 /**/*.db
 /**/*.tsv
+/**/*.csv
 #/**/result

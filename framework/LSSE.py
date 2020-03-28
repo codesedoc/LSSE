@@ -28,8 +28,8 @@ class LSSE(fr.Framework):
     def create_arg_dict(self):
         arg_dict = {
             # 'sgd_momentum': 0.4,
-            # 'semantic_compare_func': 'l2',
-            'semantic_compare_func': 'wmd',
+            'semantic_compare_func': 'l2',
+            # 'semantic_compare_func': 'wmd',
             'concatenate_input_for_gcn_hidden': True,
             'fully_scales': [768 * 2, 2],
             'position_encoding': True,
@@ -52,8 +52,6 @@ class LSSE(fr.Framework):
 
     def update_arg_dict(self, arg_dict):
         super().update_arg_dict(arg_dict)
-        if self.arg_dict['concatenate_input_for_gcn_hidden']:
-            self.arg_dict['fully_scales'][0] += self.arg_dict['gcn_hidden_dim']
 
         if self.arg_dict['repeat_train']:
             time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
@@ -74,9 +72,6 @@ class LSSE(fr.Framework):
         if not file_tool.check_dir(model_dir):
             raise RuntimeError
         self.arg_dict['model_path'] = model_dir
-
-        if self.arg_dict['semantic_compare_func'] == 'wmd':
-            self.arg_dict['fully_scales'] = [self.arg_dict['max_sentence_length'] ** 2 + self.arg_dict['bert_hidden_dim'], 2]
 
     def init_weights(self, module):
         """ Initialize the weights """
@@ -118,7 +113,10 @@ class LSSE(fr.Framework):
         adj_matrix1_batch = get_adj_matrix_batch(sentence1s)
         adj_matrix2_batch = get_adj_matrix_batch(sentence2s)
 
-        labels = torch.tensor([e.label for e in examples], dtype=torch.long, device=self.device)
+        if self.arg_dict['task_type'] == 'classification':
+            labels = torch.tensor([e.label for e in examples], dtype=torch.long, device=self.device)
+        elif self.arg_dict['task_type'] == 'regression':
+            labels = torch.tensor([e.label for e in examples], dtype=self.data_type, device=self.device)
 
         input_ids_batch = []
         token_type_ids_batch = []
@@ -318,8 +316,15 @@ class LSSE(fr.Framework):
 
         result = self.fully_connection(result)
 
-        loss = torch.nn.CrossEntropyLoss()(result.view(-1, 2), labels.view(-1))
-        predicts = np.array(result.detach().cpu().numpy()).argmax(axis=1)
+        if self.arg_dict['task_type'] == 'classification':
+            loss = torch.nn.CrossEntropyLoss()(result.view(-1, 2), labels.view(-1))
+            predicts = np.array(result.detach().cpu().numpy()).argmax(axis=1)
+
+        elif self.arg_dict['task_type'] == 'regression':
+            loss = torch.nn.MSELoss()(result.view(-1), labels.view(-1))
+            predicts = np.array(result.detach().cpu().numpy().copy()).reshape(-1)
+        else:
+            raise ValueError
 
         return loss, predicts
 

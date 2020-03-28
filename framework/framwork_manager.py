@@ -9,6 +9,8 @@ import numpy as np
 from torch.optim.lr_scheduler import LambdaLR
 import utils.SimpleProgressBar as progress_bar
 from sklearn.metrics import matthews_corrcoef, f1_score
+import scipy
+from scipy.stats import pearsonr, spearmanr
 
 # import time
 
@@ -47,8 +49,8 @@ class FrameworkManager:
         corpus = self.arg_dict['corpus']
         self.data_manager = data_tool.DataManager(corpus())
 
-        self.data_loader_dict = self.data_manager.get_loader_dict(k_fold=arg_dict['k_fold'],
-                                                                  batch_size=arg_dict['batch_size'], force=True)
+        # self.data_loader_dict = self.data_manager.get_loader_dict(k_fold=arg_dict['k_fold'],
+        #                                                           batch_size=arg_dict['batch_size'], force=True)
 
         self.framework = None
         self.optimizer = None
@@ -192,6 +194,7 @@ class FrameworkManager:
             for epoch in range(train_epochs):
                 loss_avg = 0
                 global_progress_bar = progress_bar.SimpleProgressBar()
+                self.framework.train()
                 for b, batch in enumerate(train_loader):
                     example_ids = batch['example_id']
                     self.optimizer.zero_grad()
@@ -281,7 +284,12 @@ class FrameworkManager:
             self.logger.info('{} was created!'.format(self.framework.name))
             train_loader, valid_loader = train_loader_tuple
             self.logger.info('train_loader:{}  valid_loader:{}'.format(len(train_loader), len(valid_loader)))
-            self.logger.info('begin train {}-th fold'.format(tuple_index))
+
+            if self.arg_dict['k_fold'] > 1:
+                self.logger.info('begin train {}-th fold'.format(tuple_index))
+            else:
+                self.logger.info('begin train')
+
             result = self.__train_fold__(train_loader=train_loader, valid_loader=valid_loader)
             self.trial_step = self.arg_dict['epoch'] * tuple_index
             avg_result += np.array(result[0:2], dtype=np.float)
@@ -379,9 +387,46 @@ class FrameworkManager:
         result['error_example_ids_dict'] = example_ids_dict
         return result
 
+    def __regression_evaluation__(self, data_loader):
+        result = {}
+        metric_dict = {}
+        predicts_np = None
+        labels_np = None
+        for batch in data_loader:
+            example_ids = batch['example_id']
+            # if example_ids[0, 0] == 3585:
+            #     example_ids = example_ids
+            labels = batch['label'].reshape(-1)
+            # end_time = time.time()
+            # print('time:{}'.format(end_time - start_time))
+            # start_time = time.time()
+            input_batch = self.framework.deal_with_example_batch(example_ids, data_loader.example_dict)
+            _, predicts = self.framework(**input_batch)
+
+            if predicts_np is None:
+                predicts_np = np.array(predicts.copy())
+                labels_np = labels.detach().cpu().numpy()
+            else:
+                predicts_np = np.append(predicts_np, np.array(predicts.copy()), axis=0)
+                labels_np = np.append(labels_np, labels.detach().cpu().numpy().copy(), axis=0)
+
+        pearson_corr = pearsonr(predicts_np, labels_np)[0]
+        spearman_corr = spearmanr(predicts_np, labels_np)[0]
+        metric_dict = {
+            "pearson": pearson_corr,
+            "spearmanr": spearman_corr,
+            "corr": (pearson_corr + spearman_corr) / 2,
+        }
+
+        result['metric'] = metric_dict
+        return result
+
     def evaluation_calculation(self, data_loader):
+        self.framework.eval()
         if self.arg_dict['task_type'] == 'classification':
             return self.__classification_evaluation__(data_loader)
+        if self.arg_dict['task_type'] == 'regression':
+            return self.__regression_evaluation__(data_loader)
         else:
             raise RuntimeError
 
@@ -411,6 +456,7 @@ class FrameworkManager:
         max_steps_break = False
         step_count = 0
         general_tool.setup_seed(self.arg_dict['seed'])
+        self.framework.train()
         for epoch in range(train_epochs):
             loss_avg = 0
             global_progress_bar = progress_bar.SimpleProgressBar()
@@ -470,19 +516,20 @@ class FrameworkManager:
         with torch.no_grad():
             evaluation_result = self.evaluation_calculation(test_loader)
             self.logger.info(evaluation_result['metric'])
-            example_dict = test_loader.example_dict
-            fn_error_example_ids = evaluation_result['error_example_ids_dict']['FN']
-            fp_error_example_ids = evaluation_result['error_example_ids_dict']['FP']
-            fn_sava_data = get_save_data(fn_error_example_ids)
-            fp_sava_data = get_save_data(fp_error_example_ids)
+            if self.arg_dict['task_type'] == 'classification':
+                example_dict = test_loader.example_dict
+                fn_error_example_ids = evaluation_result['error_example_ids_dict']['FN']
+                fp_error_example_ids = evaluation_result['error_example_ids_dict']['FP']
+                fn_sava_data = get_save_data(fn_error_example_ids)
+                fp_sava_data = get_save_data(fp_error_example_ids)
 
-            error_file_path = file_tool.connect_path(self.framework.arg_dict['model_path'], 'error_file')
-            file_tool.makedir(error_file_path)
+                error_file_path = file_tool.connect_path(self.framework.arg_dict['model_path'], 'error_file')
+                file_tool.makedir(error_file_path)
 
-            file_tool.save_list_data(fn_sava_data,
-                                     file_tool.connect_path(error_file_path, 'fn_error_sentence_pairs.txt'), 'w')
-            file_tool.save_list_data(fp_sava_data,
-                                     file_tool.connect_path(error_file_path, 'fp_error_sentence_pairs.txt'), 'w')
+                file_tool.save_list_data(fn_sava_data,
+                                         file_tool.connect_path(error_file_path, 'fn_error_sentence_pairs.txt'), 'w')
+                file_tool.save_list_data(fp_sava_data,
+                                         file_tool.connect_path(error_file_path, 'fp_error_sentence_pairs.txt'), 'w')
             return evaluation_result['metric']
         pass
 

@@ -53,6 +53,7 @@ class Corpus:
         self.sentence_dict = None
         self.sentence_list = None
         self.parse_info = None
+        self.data_type = None
 
         self.create_data()
 
@@ -60,6 +61,7 @@ class Corpus:
         self.create_sentences()
         self.parse_sentences()
         self.create_examples()
+        self.data_type = "2class"
 
     @abstractmethod
     def create_examples(self):

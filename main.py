@@ -13,7 +13,7 @@ def create_arg_dict():
 
     arg_dict = {
         'batch_size': 8,
-        'learn_rate': 3e-5,
+        'learn_rate': 2e-5,
         # 'sgd_momentum': 0.4,
         'optimizer': 'adam',
         'k_fold': 10,
@@ -26,11 +26,15 @@ def create_arg_dict():
         'regular_flag': False,
         'ues_gpu': -1,
         'repeat_train': True,
+        # 'corpus': corpus.stsb.get_stsb_obj,
         'corpus': corpus.mrpc.get_mrpc_obj,
+        # 'corpus': corpus.qqp.get_qqp_obj,
         # 'max_sentence_length': 50,
-        'framework_name': "LSSE",
+        'framework_name': "SeE",
         'task_type': 'classification',
-        'seed': 1234
+        # 'task_type': 'regression',
+
+        'seed': 42
     }
     general_tool.setup_seed(arg_dict['seed'])
     parser = argparse.ArgumentParser(description='PIRs')
@@ -60,7 +64,9 @@ def run_hyperor():
     hyr.tune_hyper_parameter()
 
 
-def main():
+def corpus_test():
+    # corpus.stsb.test()
+    # corpus.mrpc.test()
     # mrpc_obj = corpus.mrpc.get_mrpc_obj()
     # tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
     # general_tool.covert_transformer_tokens_to_words(mrpc_obj, tokenizer,
@@ -73,10 +79,22 @@ def main():
     #                                                 '##')
     # general_tool.calculate_the_max_len_of_tokens_split_by_bert(qqp_obj, tokenizer)
     # corpus.qqp.test()
+
+    stsb_obj = corpus.stsb.get_stsb_obj()
+    tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
+    general_tool.calculate_the_max_len_of_tokens_split_by_bert(stsb_obj, tokenizer)
+    # general_tool.covert_transformer_tokens_to_words(stsb_obj, tokenizer,
+    #                                                 'corpus/stsb/sentence_words(bert-base-cased).txt',
+    #                                                 '##')
+
+def main():
+
     run_framework()
     # run_hyperor()
     # er_analysis.test()
     # mrpc_analysis.test()
+    # corpus_test()
+
 
 def occupy_gpu():
     memory = []

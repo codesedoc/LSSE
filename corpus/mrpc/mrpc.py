@@ -146,6 +146,17 @@ class Mrpc(base_corpus.Corpus):
 
         pass
 
+    def sentence_dict_from_examples(self):
+        sentence_dict = {}
+        for e in self.train_example_dict.values():
+            sentence_dict[e.sentence1.id] = e.sentence1
+            sentence_dict[e.sentence2.id] = e.sentence2
+
+        for e in self.test_example_dict.values():
+            sentence_dict[e.sentence1.id] = e.sentence1
+            sentence_dict[e.sentence2.id] = e.sentence2
+
+        return sentence_dict
 
 def get_mrpc_obj(force=False):
     global single_mrpc_obj

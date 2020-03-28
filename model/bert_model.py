@@ -20,6 +20,7 @@ class BertForSeqClassify(torch.nn.Module):
         self.model = torch.hub.load('huggingface/pytorch-transformers', 'modelForSequenceClassification', 'bert-base-cased')
         self.tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
         self.config = self.model.config
+        self.name = self.config.model_type
 
     def forward(self, input_ids_batch, token_type_ids_batch, attention_mask_batch, labels):
         loss, outputs = self.model(input_ids_batch, attention_mask=attention_mask_batch, token_type_ids=token_type_ids_batch, labels=labels)

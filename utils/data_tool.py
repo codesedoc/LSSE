@@ -42,11 +42,12 @@ class MyDataLoader(torch_data.DataLoader):
 
 
 class ExampleManager:
-    def __init__(self, examples):
+    def __init__(self, examples, example_type="2class"):
         self.examples = examples
-        self.positives = []
-        self.negatives = []
-        self.__classification__()
+        if example_type == "2class":
+            self.positives = []
+            self.negatives = []
+            self.__classification__()
 
     def __classification__(self):
         self.positives.clear()
@@ -99,8 +100,11 @@ class DataManager:
     def __init__(self, corpus_obj):
         super().__init__()
         self.corpus = corpus_obj
-        self.train_example_manager = ExampleManager(corpus_obj.train_example_list)
-        self.test_example_manager = ExampleManager(corpus_obj.test_example_list)
+        self.train_example_manager = ExampleManager(corpus_obj.train_example_list, corpus_obj.data_type)
+        self.test_example_manager = ExampleManager(corpus_obj.test_example_list, corpus_obj.data_type)
+        if hasattr(corpus_obj, "dev_example_list"):
+            self.dev_example_manager = ExampleManager(corpus_obj.dev_example_list, corpus_obj.data_type)
+
         self.loader_dict = None
     # def __setattr__(self, key, value):
     #     super().__setattr__(key, value)
@@ -130,32 +134,43 @@ class DataManager:
     #     return self.get_sentence_by_id(sentence_ids[0]), self.get_sentence_by_id(sentence_ids[1])
 
     def list_of_train_loader_tuple(self, k_fold, batch_size):
-        if k_fold <= 1:
+        if k_fold == 1:
             return ValueError
-        if DataManager.example_groups is None:
-            DataManager.example_groups = self.train_example_manager.divide_into_groups_keep_rate(k_group=k_fold)
-        example_groups = DataManager.example_groups
-        self.check_example_groups(example_groups)
-        result = []
-        train_group = []
-        valid_group = []
-        for i in range(k_fold):
-            train_group.clear()
-            valid_group.clear()
-            for j in range(k_fold):
-                if j == i:
-                    valid_group = example_groups[j].copy()
-                else:
-                    train_group.extend(example_groups[j].copy())
-            if len(train_group) == 0 or len(valid_group) == 0:
-                raise ValueError
-            train_loader = self.create_loader(MyDateSet(train_group.copy()), batch_size=batch_size, example_dict=self.corpus.train_example_dict)
-            valid_loader = self.create_loader(MyDateSet(valid_group.copy()), batch_size=batch_size, example_dict=self.corpus.train_example_dict)
+
+        if k_fold < 0:
+            train_loader = self.create_loader(MyDateSet(self.train_example_manager.examples), batch_size=batch_size,
+                                              example_dict=self.corpus.train_example_dict)
+            valid_loader = self.create_loader(MyDateSet(self.dev_example_manager.examples), batch_size=batch_size,
+                                              example_dict=self.corpus.train_example_dict)
             loader_tuple = (train_loader, valid_loader)
-            # print('train_loader:{}  valid_loader:{}'.format(len(train_loader), len(valid_loader)))
-            # self.check_data_loader_tuple(loader_tuple)
-            result.append(loader_tuple)
-        # self.check_data_loader_tuple_list(result)
+
+            result = loader_tuple,
+
+        else:
+            if DataManager.example_groups is None:
+                DataManager.example_groups = self.train_example_manager.divide_into_groups_keep_rate(k_group=k_fold)
+            example_groups = DataManager.example_groups
+            self.check_example_groups(example_groups)
+            result = []
+            train_group = []
+            valid_group = []
+            for i in range(k_fold):
+                train_group.clear()
+                valid_group.clear()
+                for j in range(k_fold):
+                    if j == i:
+                        valid_group = example_groups[j].copy()
+                    else:
+                        train_group.extend(example_groups[j].copy())
+                if len(train_group) == 0 or len(valid_group) == 0:
+                    raise ValueError
+                train_loader = self.create_loader(MyDateSet(train_group.copy()), batch_size=batch_size, example_dict=self.corpus.train_example_dict)
+                valid_loader = self.create_loader(MyDateSet(valid_group.copy()), batch_size=batch_size, example_dict=self.corpus.train_example_dict)
+                loader_tuple = (train_loader, valid_loader)
+                # print('train_loader:{}  valid_loader:{}'.format(len(train_loader), len(valid_loader)))
+                # self.check_data_loader_tuple(loader_tuple)
+                result.append(loader_tuple)
+            # self.check_data_loader_tuple_list(result)
         return result
 
     def create_loader(self, data_set, drop_last=False, batch_size=2, shuffle=True, example_dict=None):

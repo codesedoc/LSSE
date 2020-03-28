@@ -61,17 +61,22 @@ import numpy as np
 #
 #
 # out.sum().backward()
-class c:
-    value =1
-    pass
-x =dict({1:[2],2:5,4:c()})
-t = list(x.values())
-print(x[4])
-print(t[2])
-print(x[4].value)
-print(t[2].value)
-t[2].value = 0
-print(x[4].value)
-print(t[2].value)
+# class c:
+#     value =1
+#     pass
+# x =dict({1:[2],2:5,4:c()})
+# t = list(x.values())
+# print(x[4])
+# print(t[2])
+# print(x[4].value)
+# print(t[2].value)
+# t[2].value = 0
+# print(x[4].value)
+# print(t[2].value)
 
+import tqdm
+import time
+for i in tqdm.trange(5, desc="Epoch"):
+    for j in tqdm.tqdm(range(2), desc="iteration"):
+        time.sleep(0.5)
 pass

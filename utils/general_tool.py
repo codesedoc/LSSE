@@ -150,7 +150,6 @@ def covert_transformer_tokens_to_words(corpus_obj, tokenizer,  result_file, spli
     sentence_dict = corpus_obj.sentence_dict
     words_dict = {}
     special_words_dict = {}
-    sentence_dict = {'233158': sentence_dict["233158"]}
     for sent_id, sentence in sentence_dict.items():
         inputs_ls_cased = tokenizer.encode_plus(sentence.original_sentence())
         input_ids = inputs_ls_cased["input_ids"]

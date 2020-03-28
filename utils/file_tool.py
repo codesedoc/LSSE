@@ -60,6 +60,12 @@ def check_file(filename):
     return os.path.exists(filename)
 
 
+def read_csv(input_file, delimiter=',', quotechar=None):
+    """Reads a tab separated value file."""
+    with open(input_file, "r", encoding="utf-8-sig") as f:
+        return list(csv.reader(f, delimiter=delimiter, quotechar=quotechar))
+
+
 def read_tsv(input_file, quotechar=None):
     """Reads a tab separated value file."""
     with open(input_file, "r", encoding="utf-8-sig") as f:

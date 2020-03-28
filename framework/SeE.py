@@ -37,14 +37,20 @@ class SeE(fr.LSeE):
         return arg_dict
 
     def create_models(self):
-        self.with_linear_head = False
+        self.with_linear_head = True
         if self.with_linear_head:
-            self.bert = ALBertForSeqClassify()
+            self.bert = BertForSeqClassify()
         else:
             self.bert = BertBase()
             config = self.bert.config
             self.dropout = torch.nn.Dropout(config.hidden_dropout_prob)
-            self.classifier = torch.nn.Linear(config.hidden_size, 2)
+            if self.arg_dict['task_type'] == 'classification':
+                self.classifier = torch.nn.Linear(config.hidden_size, 2)
+            elif self.arg_dict['task_type'] == 'regression':
+                self.classifier = torch.nn.Linear(config.hidden_size, 1)
+            else:
+                raise ValueError
+
             self.classifier.weight.data.normal_(mean=0.0, std=config.initializer_range)
             self.classifier.bias.data.zero_()
         self.bert_name = self.bert.name
@@ -131,7 +137,11 @@ class SeE(fr.LSeE):
 
         sentence1s = [e.sentence1 for e in examples]
         sentence2s = [e.sentence2 for e in examples]
-        labels = torch.tensor([e.label for e in examples], dtype=torch.long, device=self.device)
+
+        if self.arg_dict['task_type'] == 'classification':
+            labels = torch.tensor([e.label for e in examples], dtype=torch.long, device=self.device)
+        elif self.arg_dict['task_type'] == 'regression':
+            labels = torch.tensor([e.label for e in examples], dtype=self.data_type, device=self.device)
 
         input_ids_batch = []
         token_type_ids_batch = []
@@ -180,22 +190,36 @@ class SeE(fr.LSeE):
         else:
             input_ids_batch, token_type_ids_batch, attention_mask_batch, labels = input_data
 
+
         if not self.with_linear_head:
             last_hidden_states, pooled_output = self.bert(input_ids_batch, token_type_ids_batch, attention_mask_batch)
             output = self.dropout(pooled_output)
             predicts = self.classifier(output)
-            if torch.isnan(last_hidden_states).sum() > 0:
-                print(torch.isnan(last_hidden_states))
+            if self.arg_dict['task_type'] == 'classification':
+                if torch.isnan(last_hidden_states).sum() > 0:
+                    print(torch.isnan(last_hidden_states))
+                    raise ValueError
+                loss = torch.nn.CrossEntropyLoss()(predicts.view(-1, 2), labels.view(-1))
+                predicts = np.array(predicts.detach().cpu().numpy()).argmax(axis=1)
+            elif self.arg_dict['task_type'] == 'regression':
+                loss = torch.nn.MSELoss()(predicts.view(-1), labels.view(-1))
+                predicts = np.array(predicts.detach().cpu().numpy().copy()).reshape(-1)
+
+            else:
                 raise ValueError
 
-            loss = torch.nn.CrossEntropyLoss()(predicts.view(-1, 2), labels.view(-1))
-
-            predicts = np.array(predicts.detach().cpu().numpy()).argmax(axis=1)
         else:
             loss, outputs = self.bert(input_ids_batch, token_type_ids_batch, attention_mask_batch, labels)
-            predicts = outputs
-            loss = torch.nn.CrossEntropyLoss()(predicts.view(-1, 2), labels.view(-1))
-            predicts = np.array(predicts.detach().cpu().numpy()).argmax(axis=1)
+            if self.arg_dict['task_type'] == 'classification':
+                predicts = outputs
+                loss = torch.nn.CrossEntropyLoss()(predicts.view(-1, 2), labels.view(-1))
+                predicts = np.array(predicts.detach().cpu().numpy()).argmax(axis=1)
+
+            elif self.arg_dict['task_type'] == 'regression':
+                loss = torch.nn.MSELoss()(outputs.view(-1), labels.view(-1))
+                predicts = np.array(outputs.detach().cpu().numpy().copy()).reshape(-1)
+            else:
+                raise ValueError
         return loss, predicts
 
     def get_input_of_visualize_model(self, example_ids, example_dict):
