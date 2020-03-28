@@ -26,7 +26,7 @@ class SeE(fr.LSeE):
     def create_arg_dict(self):
         arg_dict = {
             # 'sgd_momentum': 0.4,
-            'fully_scales': [768, 150, 1],
+            'fully_scales': [768, 1],
             # 'fully_regular': 1e-4,
             # 'bert_regular': 1e-4,
             'bert_hidden_dim': 768,
@@ -37,7 +37,7 @@ class SeE(fr.LSeE):
         return arg_dict
 
     def create_models(self):
-        self.with_linear_head = True
+        self.with_linear_head = False
         if self.with_linear_head:
             self.bert = BertForSeqClassify()
         else:

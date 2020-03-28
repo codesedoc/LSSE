@@ -194,7 +194,7 @@ class FrameworkManager:
             for epoch in range(train_epochs):
                 loss_avg = 0
                 global_progress_bar = progress_bar.SimpleProgressBar()
-                self.framework.train()
+                # self.framework.train()
                 for b, batch in enumerate(train_loader):
                     example_ids = batch['example_id']
                     self.optimizer.zero_grad()
@@ -422,7 +422,7 @@ class FrameworkManager:
         return result
 
     def evaluation_calculation(self, data_loader):
-        self.framework.eval()
+        # self.framework.eval()
         if self.arg_dict['task_type'] == 'classification':
             return self.__classification_evaluation__(data_loader)
         if self.arg_dict['task_type'] == 'regression':
@@ -456,11 +456,14 @@ class FrameworkManager:
         max_steps_break = False
         step_count = 0
         general_tool.setup_seed(self.arg_dict['seed'])
-        self.framework.train()
+        # self.framework.train()
         for epoch in range(train_epochs):
             loss_avg = 0
             global_progress_bar = progress_bar.SimpleProgressBar()
             for b, batch in enumerate(train_loader):
+
+                # self.framework.train()
+
                 example_ids = batch['example_id']
                 self.optimizer.zero_grad()
 

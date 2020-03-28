@@ -34,7 +34,7 @@ def create_arg_dict():
         'task_type': 'classification',
         # 'task_type': 'regression',
 
-        'seed': 42
+        'seed': 1234
     }
     general_tool.setup_seed(arg_dict['seed'])
     parser = argparse.ArgumentParser(description='PIRs')
