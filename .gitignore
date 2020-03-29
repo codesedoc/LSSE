@@ -24,3 +24,5 @@ result/visualization
 /**/*.tsv
 /**/*.csv
 #/**/result
+/**/runs
+/**/*.json
