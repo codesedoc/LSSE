@@ -74,9 +74,12 @@ import numpy as np
 # print(x[4].value)
 # print(t[2].value)
 
-import tqdm
-import time
-for i in tqdm.trange(5, desc="Epoch"):
-    for j in tqdm.tqdm(range(2), desc="iteration"):
-        time.sleep(0.5)
+# import tqdm
+# import time
+# for i in tqdm.trange(5, desc="Epoch"):
+#     for j in tqdm.tqdm(range(2), desc="iteration"):
+#         time.sleep(0.5)
+def func(c1, c2=3):
+    print(c1, c2)
+func(2, 1,)
 pass

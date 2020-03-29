@@ -57,14 +57,6 @@ def get_global_position_encodings(length=100, dimension=300):
 #     return sinusoid_table
 
 
-def setup_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.backends.cudnn.deterministic = True
-
-
 def is_number(s):
     try:
         float(s)
@@ -238,6 +230,21 @@ def covert_transformer_tokens_to_words(corpus_obj, tokenizer,  result_file, spli
 #         save_data.append(sent_id + '\t' + ' '.join(words))
 #     file_tool.save_list_data(save_data, result_file, 'w')
 #     pass
+
+
+# def setup_seed(seed):
+#     torch.manual_seed(seed)
+#     torch.cuda.manual_seed_all(seed)
+#     np.random.seed(seed)
+#     random.seed(seed)
+#     torch.backends.cudnn.deterministic = True
+
+
+def setup_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
 
 def test():
     result1 = get_global_position_encodings(10, 6)

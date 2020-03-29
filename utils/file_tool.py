@@ -55,6 +55,8 @@ def makedir(path):
 def check_dir(path):
     return os.path.exists(path)
 
+def list_dir(path):
+    return os.listdir(path)
 
 def check_file(filename):
     return os.path.exists(filename)
@@ -94,6 +96,7 @@ class FileOperator:
 
 
 class PathManager:
+    model_running_data_log_file = 'result/log.txt'
     base_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     # data_path = os.path.join(base_dir, 'data')
 
