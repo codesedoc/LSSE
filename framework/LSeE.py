@@ -14,8 +14,8 @@ class LSeE(fr.Framework):
     name = "LSeE"
     result_path = file_tool.connect_path('result', name)
 
-    def __init__(self, arg_dict):
-        super().__init__(arg_dict)
+    def __init__(self, args):
+        super().__init__(args)
         self.name = LSeE.name
         self.result_path = LSeE.result_path
 
@@ -23,36 +23,19 @@ class LSeE(fr.Framework):
     def framework_name(cls):
         return cls.name
 
-    def create_arg_dict(self):
-        arg_dict = {
-            'semantic_compare_func': 'l2',
-            'fully_scales': [768 * 2, 2],
-            # 'fully_regular': 1e-4,
-            # 'bert_regular': 1e-4,
-            'bert_hidden_dim': 768,
-            'pad_on_right': True,
-            'sentence_max_len_for_bert': 128,
-            'dtype': torch.float32,
-        }
-        return arg_dict
+    def update_args(self):
+        super().update_args()
 
-    def update_arg_dict(self, arg_dict):
-        super().update_arg_dict(arg_dict)
-
-        if self.arg_dict['repeat_train']:
-            time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
-            model_dir = file_tool.connect_path(self.result_path, 'train',
+        time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
+        output_dir = file_tool.connect_path(self.result_path, 'train',
                                                'bs:{}-lr:{}-com_fun:{}'.
                                                format(self.arg_dict['batch_size'], self.arg_dict['learn_rate'],
                                                       self.arg_dict['semantic_compare_func']), time_str)
 
-        else:
-            model_dir = file_tool.connect_path(self.result_path, 'test')
-
-        file_tool.makedir(model_dir)
-        if not file_tool.check_dir(model_dir):
+        file_tool.makedir(output_dir)
+        if not file_tool.check_dir(output_dir):
             raise RuntimeError
-        self.arg_dict['model_path'] = model_dir
+        self.args.output_dir = output_dir
 
     def create_models(self):
         self.bert = BertBase()

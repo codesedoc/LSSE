@@ -18,7 +18,6 @@ class BertForSeqClassify(torch.nn.Module):
     def __init__(self):
         super().__init__()
         self.model = torch.hub.load('huggingface/pytorch-transformers', 'modelForSequenceClassification', 'bert-base-cased')
-        self.tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
         self.config = self.model.config
         self.name = self.config.model_type
 
