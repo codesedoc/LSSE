@@ -186,6 +186,7 @@ class FrameworkManager:
         # train_iterator = trange(
         #     epochs_trained, int(args.num_train_epochs), desc="Epoch", disable=args.local_rank not in [-1, 0],
         # )
+        loss_list = []
         general_tool.setup_seed(args.seed)  # Added here for reproductibility
         for _ in range(int(args.num_train_epochs)):
             epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=args.local_rank not in [-1, 0])
@@ -205,7 +206,7 @@ class FrameworkManager:
                     )  # XLM, DistilBERT, RoBERTa, and XLM-RoBERTa don't use segment_ids
                 outputs = model(**inputs)
                 loss = outputs[0]  # model outputs are always tuple in transformers (see doc)
-
+                loss_list.append(loss.item())
                 if args.n_gpu > 1:
                     loss = loss.mean()  # mean() to average on multi-gpu parallel training
                 if args.gradient_accumulation_steps > 1:
@@ -274,6 +275,8 @@ class FrameworkManager:
 
         if args.local_rank in [-1, 0]:
             tb_writer.close()
+
+        file_tool.save_data_pickle(loss_list, 'loss_list_my.pkl')
 
         return global_step, tr_loss / global_step
 
