@@ -79,7 +79,50 @@ import numpy as np
 # for i in tqdm.trange(5, desc="Epoch"):
 #     for j in tqdm.tqdm(range(2), desc="iteration"):
 #         time.sleep(0.5)
-def func(c1, c2=3):
-    print(c1, c2)
-func(2, 1,)
+# def func(c1, c2=3):
+#     print(c1, c2)
+# func(2, 1,)
+import logging
+
+# root = logging.root
+logging.debug('logger debug message')
+logging.info('logger info message')
+logging.warning('logger warning message')
+logging.error('logger error message')
+logging.critical('logger critical message')
+
+# logging.basicConfig(
+#         format=" %(levelname)s - %(name)s -   %(message)s",
+#         datefmt="%m/%d/%Y %H:%M:%S",
+#         level= logging.DEBUG,
+#     )
+
+# logging.basicConfig(
+#         format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
+#         datefmt="%m/%d/%Y %H:%M:%S",
+#         level= logging.INFO,
+#     )
+
+logger1 = logging.getLogger('mylogger')
+# logger1.setLevel(logging.DEBUG)
+# 创建一个handler，用于写入日志文件
+fh = logging.FileHandler('./test.log')
+# 再创建一个handler，用于输出到控制台
+ch = logging.StreamHandler()
+# 定义handler的输出格式formatter
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+fh.setFormatter(formatter)
+ch.setFormatter(formatter)
+
+logger1.addHandler(fh)
+logger1.addHandler(ch)
+
+
+logger1.propagate = False
+logger1.debug('logger1 debug message')
+logger1.info('logger1 info message')
+logger1.warning('logger1 warning message')
+logger1.error('logger1 error message')
+logger1.critical('logger1 critical message')
+
 pass
