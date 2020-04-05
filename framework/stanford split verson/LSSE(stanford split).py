@@ -73,7 +73,7 @@ class LSSE(fr.Framework):
             raise RuntimeError
         self.arg_dict['model_path'] = model_dir
 
-    def init_weights(self, module):
+    def _init_weights(self, module):
         """ Initialize the weights """
         if isinstance(module, (torch.nn.Linear)):
             module.weight.data.normal_(mean=0.0, std=self.bert.config.initializer_range)

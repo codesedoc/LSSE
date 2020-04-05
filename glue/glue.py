@@ -69,6 +69,7 @@ glue_output_modes = {
 def glue_convert_examples_to_features(
     examples,
     tokenizer,
+    framework_name,
     max_length=512,
     task=None,
     label_list=None,

@@ -91,6 +91,123 @@ class InputFeatures(object):
         """Serializes this instance to a JSON string."""
         return json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n"
 
+class LSSEInputFeatures(InputFeatures):
+    def __init__(self, input_ids, attention_mask=None, token_type_ids=None, label=None):
+        super().__init__(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids, label=label)
+        self.input_ids = input_ids
+        self.attention_mask = attention_mask
+        self.token_type_ids = token_type_ids
+        self.label = label
+        self.input_ids = input_ids
+        self.attention_mask = attention_mask
+        self.token_type_ids = token_type_ids
+        self.label = label
+
+        examples = [example_dict[str(e_id.item())] for e_id in example_ids]
+        sentence_max_len = self.arg_dict['sentence_max_len_for_bert']
+        pad_on_right = self.arg_dict['pad_on_right']
+        pad_token = self.bert.tokenizer.convert_tokens_to_ids([self.bert.tokenizer.pad_token])[0]
+        sep_token = self.bert.tokenizer.convert_tokens_to_ids([self.bert.tokenizer.sep_token])[0]
+        mask_padding_with_zero = True
+        pad_token_segment_id = 0
+
+        sentence1s = [e.sentence1 for e in examples]
+        sentence2s = [e.sentence2 for e in examples]
+
+        def get_adj_matrix_batch(sentences):
+            adj_matrixs = []
+            for s in sentences:
+                adj_matrixs.append(parser_tool.dependencies2adj_matrix(s.syntax_info['dependencies'],
+                                                                       self.arg_dict['dep_kind_count'],
+                                                                       self.arg_dict['max_sentence_length']))
+            return torch.from_numpy(np.array(adj_matrixs)).to(device=self.device, dtype=self.data_type)
+
+        adj_matrix1_batch = get_adj_matrix_batch(sentence1s)
+        adj_matrix2_batch = get_adj_matrix_batch(sentence2s)
+
+        if self.arg_dict['task_type'] == 'classification':
+            labels = torch.tensor([e.label for e in examples], dtype=torch.long, device=self.device)
+        elif self.arg_dict['task_type'] == 'regression':
+            labels = torch.tensor([e.label for e in examples], dtype=self.data_type, device=self.device)
+
+        input_ids_batch = []
+        token_type_ids_batch = []
+        attention_mask_batch = []
+        sep_index_batch = []
+        sent1_len_batch = []
+        sent2_len_batch = []
+        word_piece_flags_batch = []
+        sent1_org_len_batch = []
+        sent2_org_len_batch = []
+        sent1_id_batch = []
+        for s1, s2 in zip(sentence1s, sentence2s):
+            inputs_ls_cased = self.bert.tokenizer.encode_plus(s1.sentence_with_root_head(), s2.sentence_with_root_head(),
+                                                                  add_special_tokens=True,
+                                                                  max_length=sentence_max_len, )
+            input_ids, token_type_ids = inputs_ls_cased["input_ids"], inputs_ls_cased["token_type_ids"]
+
+            word_piece_flags_batch.append(general_tool.word_piece_flag_list(self.bert.tokenizer.convert_ids_to_tokens(input_ids), '##'))
+
+            attention_mask = [1 if mask_padding_with_zero else 0] * len(input_ids)
+
+            padding_length = sentence_max_len - len(input_ids)
+            if not pad_on_right:
+                input_ids = ([pad_token] * padding_length) + input_ids
+                attention_mask = ([0 if mask_padding_with_zero else 1] * padding_length) + attention_mask
+                token_type_ids = ([pad_token_segment_id] * padding_length) + token_type_ids
+            else:
+                input_ids = input_ids + ([pad_token] * padding_length)
+                attention_mask = attention_mask + ([0 if mask_padding_with_zero else 1] * padding_length)
+                token_type_ids = token_type_ids + ([pad_token_segment_id] * padding_length)
+
+            input_ids_batch.append(input_ids)
+            token_type_ids_batch.append(token_type_ids)
+            attention_mask_batch.append(attention_mask)
+
+            sep_indexes = []
+
+            for sep_index, id_ in enumerate(input_ids.copy()):
+                if id_ == sep_token:
+                    sep_indexes.append(sep_index)
+
+            if len(sep_indexes) != 2:
+                raise ValueError
+
+            sep_index_batch.append(sep_indexes[0])
+            sent1_len_batch.append(sep_indexes[0]-1)
+            sent2_len_batch.append(sep_indexes[1] - sep_indexes[0] - 1)
+
+            sent1_org_len_batch.append(s1.len_of_tokens())
+            sent2_org_len_batch.append(s2.len_of_tokens())
+            sent1_id_batch.append(s1.id)
+
+        input_ids_batch = torch.tensor(input_ids_batch, device=self.device)
+        token_type_ids_batch = torch.tensor(token_type_ids_batch, device=self.device)
+        attention_mask_batch = torch.tensor(attention_mask_batch, device=self.device)
+
+
+
+        result = {
+            'input_ids_batch': input_ids_batch,
+            'token_type_ids_batch': token_type_ids_batch,
+            'attention_mask_batch': attention_mask_batch,
+            'sep_index_batch': sep_index_batch,
+
+            'word_piece_flags_batch': word_piece_flags_batch,
+
+            'sent1_org_len_batch': sent1_org_len_batch,
+            'sent1_len_batch': sent1_len_batch,
+            'adj_matrix1_batch': adj_matrix1_batch,
+
+            'sent2_org_len_batch': sent2_org_len_batch,
+            'sent2_len_batch': sent2_len_batch,
+            'adj_matrix2_batch': adj_matrix2_batch,
+
+            'labels': labels,
+
+            'sent1_id_batch': sent1_id_batch
+        }
+        return result
 
 class DataProcessor(object):
     """Base class for data converters for sequence classification data sets."""

@@ -54,6 +54,31 @@ def create_args():
 
     # Other parameters
     parser.add_argument(
+        "-f",
+        "--framework_name",
+        type=str,
+        default="SeE",
+        help="The name of framework, choose in [SeE, LE, LSeE, LSyE, LSSE]",
+        choices=['SeE', 'LE', 'LSeE', 'LSyE', 'LSSE']
+    )
+
+    parser.add_argument(
+        "-scf",
+        "--semantic_compare_func",
+        type=str,
+        default="l2",
+        help="The name of framework, choose in [l2, wmd]",
+        choices=['l2', 'wmd']
+    )
+
+    parser.add_argument(
+        "-woc",
+        "--without_concatenate_input_for_gcn_hidden",
+        action="store_true",
+        help="Whether without_concatenate_input_for_gcn_hidden?",
+    )
+
+    parser.add_argument(
         "--config_name", default="", type=str, help="Pretrained config name or path if not the same as model_name",
     )
     parser.add_argument(
@@ -139,6 +164,9 @@ def create_args():
         help="For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']."
              "See details at https://nvidia.github.io/apex/amp.html",
     )
+
+
+
     parser.add_argument("--local_rank", type=int, default=-1, help="For distributed training: local_rank")
     parser.add_argument("--server_ip", type=str, default="", help="For distant debugging.")
     parser.add_argument("--server_port", type=str, default="", help="For distant debugging.")
@@ -185,6 +213,8 @@ def create_args():
     args.device = device
     args.max_sentence_length = 50
     args.optimizer = 'adam'
+    args.gcn_hidden_dim = 768
+
     return args
 
 

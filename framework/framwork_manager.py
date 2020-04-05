@@ -34,11 +34,6 @@ class FrameworkManager:
             self.trial = trial
             self.trial_step = 0
             self.framework_logger_name += str(trial.number)
-        self.create_framework()
-
-    def create_framework(self):
-        # Set seed
-        general_tool.setup_seed(self.args.seed)
 
         # Prepare GLUE task
         self.args.task_name = self.args.task_name.lower()
@@ -47,48 +42,32 @@ class FrameworkManager:
         processor = glue.glue_processors[self.args.task_name]()
         self.args.output_mode = glue.glue_output_modes[self.args.task_name]
         label_list = processor.get_labels()
-        num_labels = len(label_list)
+        self.args.num_labels = len(label_list)
+
+        # Create framework
+        self.create_framework()
+
+    def create_framework(self):
+        # Set seed
+        general_tool.setup_seed(self.args.seed)
 
         # Load pretrained model and tokenizer
         if self.args.local_rank not in [-1, 0]:
             torch.distributed.barrier()  # Make sure only the first process in distributed training will download model & vocab
 
         self.args.model_type = self.args.model_type.lower()
+        _, _, self.tokenizer_class = MODEL_CLASSES[self.args.model_type]
+        # self.tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', self.args.model_name_or_path,
+        #                                 do_lower_case=self.args.do_lower_case,
+        #                                 cache_dir=self.args.cache_dir if self.args.cache_dir else None)
 
-        # self.framework = self.get_framework()
-        config_class, model_class, tokenizer_class = MODEL_CLASSES[self.args.model_type]
-        # config = config_class.from_pretrained(
-        #     self.args.config_name if self.args.config_name else self.args.model_name_or_path,
-        #     num_labels=num_labels,
-        #     finetuning_task=self.args.task_name,
-        #     cache_dir=self.args.cache_dir if self.args.cache_dir else None,
-        # )
+        self.tokenizer = self.tokenizer_class.from_pretrained(
+            self.args.tokenizer_name if self.args.tokenizer_name else self.args.model_name_or_path,
+            do_lower_case=self.args.do_lower_case,
+            cache_dir=self.args.cache_dir if self.args.cache_dir else None,
+        )
 
-        config = torch.hub.load('huggingface/pytorch-transformers', 'config', self.args.model_name_or_path,
-                                num_labels=num_labels,
-                                finetuning_task=self.args.task_name,
-                                cache_dir=self.args.cache_dir if self.args.cache_dir else None)
-
-        self.tokenizer_class = tokenizer_class
-        # self.tokenizer = tokenizer_class.from_pretrained(
-        #     self.args.tokenizer_name if self.args.tokenizer_name else self.args.model_name_or_path,
-        #     do_lower_case=self.args.do_lower_case,
-        #     cache_dir=self.args.cache_dir if self.args.cache_dir else None,
-        # )
-        # self.framework = model_class.from_pretrained(
-        #     self.args.model_name_or_path,
-        #     from_tf=bool(".ckpt" in self.args.model_name_or_path),
-        #     config=config,
-        #     cache_dir=self.args.cache_dir if self.args.cache_dir else None,
-        # )
-        self.tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', self.args.model_name_or_path,
-                                        do_lower_case=self.args.do_lower_case,
-                                        cache_dir=self.args.cache_dir if self.args.cache_dir else None)
-        self.framework = torch.hub.load('huggingface/pytorch-transformers', 'modelForSequenceClassification', self.args.model_name_or_path,
-                                        from_tf=bool(".ckpt" in self.args.model_name_or_path),
-                                        config=config,
-                                        cache_dir=self.args.cache_dir if self.args.cache_dir else None)
-
+        self.framework = self.get_framework()
 
         self.framework.to(self.args.device)
         self.framework.name = "SeE"
@@ -97,10 +76,37 @@ class FrameworkManager:
                                           file_tool.connect_path(self.args.output_dir, 'log.txt'))
 
         self.logger.info('{} was created!'.format(self.framework.name))
+        self._print_framework_parameter()
 
     def get_framework(self):
         frame_work = fr.frameworks[self.args.framework_name]
         return frame_work(self.args)
+
+    def _print_framework_parameter(self):
+        framework_parameter_count_dict = self.framework.count_of_parameter()
+        self.logger.info('')
+        self.logger.info("*" * 80)
+        self.logger.info('{:^80}'.format("NN parameter count"))
+        self.logger.info("*" * 80)
+
+        self.logger.info('{:^20}{:^20}{:^20}{:^20}'.format('model name', 'total', 'weight', 'bias'))
+        for item in framework_parameter_count_dict:
+            self.logger.info('{:^20}{:^20}{:^20}{:^20}'.format(item['name'], item['total'], item['weight'], item['bias']))
+        self.logger.info("*" * 80)
+
+    def _print_args(self):
+        self.logger.info('')
+        self.logger.info("*" * 80)
+
+        self.logger.info('{:^80}'.format("Training/evaluation arguments"))
+        self.logger.info("*" * 80)
+
+        arg_dict = vars(self.args).copy()
+        # arg_dict['learning_rate'] = 0
+        for key, value in arg_dict.items():
+            self.logger.info('{}: {}'.format(key, value))
+        self.logger.info("*" * 80)
+        self.logger.info('')
 
     def train(self, train_dataset):
         """ Train the model """
@@ -135,11 +141,9 @@ class FrameworkManager:
             optimizer = AdamW(optimizer_grouped_parameters, lr=self.args.learning_rate, eps=self.args.adam_epsilon)
         else:
             raise ValueError
-
         scheduler = get_linear_schedule_with_warmup(
             optimizer, num_warmup_steps=self.args.warmup_steps, num_training_steps=t_total
         )
-
         self.optimizer = optimizer
         self.scheduler = scheduler
 
@@ -257,7 +261,7 @@ class FrameworkManager:
                                 logs[eval_key] = value
 
                         loss_scalar = (tr_loss - logging_loss) / self.args.logging_steps
-                        learning_rate_scalar = scheduler.get_last_ls()[0]
+                        learning_rate_scalar = scheduler.get_last_lr()[0]
                         logs["learning_rate"] = learning_rate_scalar
                         logs["loss"] = loss_scalar
                         logging_loss = tr_loss
@@ -365,7 +369,7 @@ class FrameworkManager:
         return results
 
     def run(self):
-        self.logger.info("Training/evaluation parameters %s", self.args)
+        self._print_args()
         # Training
         if self.args.do_train:
             train_dataset = glue.load_and_cache_examples(

@@ -2,11 +2,19 @@ import torch
 
 
 class BertBase(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, args):
         super().__init__()
-        self.tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
-        self.model = torch.hub.load('huggingface/pytorch-transformers', 'model', 'bert-base-cased')
-        self.config = self.model.config
+        self.args = args
+        self.config = torch.hub.load('huggingface/pytorch-transformers', 'config', self.args.model_name_or_path,
+                                     num_labels=args.num_labels,
+                                     finetuning_task=self.args.task_name,
+                                     cache_dir=self.args.cache_dir if self.args.cache_dir else None)
+
+        self.model = torch.hub.load('huggingface/pytorch-transformers', 'model',
+                                    self.args.model_name_or_path,
+                                    from_tf=bool(".ckpt" in self.args.model_name_or_path),
+                                    config=self.config,
+                                    cache_dir=self.args.cache_dir if self.args.cache_dir else None)
         self.name = self.config.model_type
 
     def forward(self, input_ids_batch, token_type_ids_batch, attention_mask_batch):
@@ -17,10 +25,18 @@ class BertBase(torch.nn.Module):
 class BertForSeqClassify(torch.nn.Module):
     def __init__(self, args):
         super().__init__()
-        self.agrs = args
-        self.model = torch.hub.load('huggingface/pytorch-transformers', 'modelForSequenceClassification', 'bert-base-cased')
-        self.config = self.model.config
-        self.name = self.config.model_type
+        self.args = args
+        self.config = torch.hub.load('huggingface/pytorch-transformers', 'config', self.args.model_name_or_path,
+                                num_labels=args.num_labels,
+                                finetuning_task=self.args.task_name,
+                                cache_dir=self.args.cache_dir if self.args.cache_dir else None)
+
+        self.model = torch.hub.load('huggingface/pytorch-transformers', 'modelForSequenceClassification',
+                                        self.args.model_name_or_path,
+                                        from_tf=bool(".ckpt" in self.args.model_name_or_path),
+                                        config=self.config,
+                                        cache_dir=self.args.cache_dir if self.args.cache_dir else None)
+        self.name = self.config.model_type + '_for_classification'
 
     def forward(self, input_ids_batch, token_type_ids_batch, attention_mask_batch, labels):
         loss, outputs = self.model(input_ids_batch, attention_mask=attention_mask_batch, token_type_ids=token_type_ids_batch, labels=labels)

@@ -126,3 +126,12 @@ logger1 critical message
 2020-03-31 18:58:51,950 - mylogger - WARNING - logger1 warning message
 2020-03-31 18:58:51,950 - mylogger - ERROR - logger1 error message
 2020-03-31 18:58:51,950 - mylogger - CRITICAL - logger1 critical message
+2020-04-01 16:53:54,068 - mylogger - WARNING - logger1 warning message
+2020-04-01 16:53:54,068 - mylogger - ERROR - logger1 error message
+2020-04-01 16:53:54,068 - mylogger - CRITICAL - logger1 critical message
+2020-04-01 16:54:05,359 - mylogger - WARNING - logger1 warning message
+2020-04-01 16:54:05,359 - mylogger - ERROR - logger1 error message
+2020-04-01 16:54:05,359 - mylogger - CRITICAL - logger1 critical message
+2020-04-01 16:54:17,425 - mylogger - WARNING - logger1 warning message
+2020-04-01 16:54:17,425 - mylogger - ERROR - logger1 error message
+2020-04-01 16:54:17,425 - mylogger - CRITICAL - logger1 critical message
