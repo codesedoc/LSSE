@@ -488,7 +488,9 @@ def load_and_cache_examples(
         tokenizer,
         model_type,
         model_name_or_path,
+        framework_name,
         evaluate=False,
+        test=False,
         max_seq_length=512,
         max_sent_length=50,
         overwrite_cache=False,
@@ -503,11 +505,21 @@ def load_and_cache_examples(
         data_dir = processor.data_path
     output_mode = glue_output_modes[task]
 
+    if evaluate and test:
+        raise ValueError
+
+    if evaluate:
+        data_set_type = 'dev'
+    elif test:
+        data_set_type = 'test'
+    else:
+        data_set_type = 'train'
+
     # Load data features from cache or dataset file
     cached_features_file = os.path.join(
         data_dir,
         "cached_{}_{}_{}_{}".format(
-            "dev" if evaluate else "train",
+            data_set_type,
             list(filter(None, model_name_or_path.split("/"))).pop(),
             str(max_seq_length),
             str(task),
@@ -523,11 +535,12 @@ def load_and_cache_examples(
             # HACK(label indices are swapped in RoBERTa pretrained model)
             label_list[1], label_list[2] = label_list[2], label_list[1]
         examples = (
-            processor.get_dev_examples(data_dir) if evaluate else processor.get_train_examples(data_dir)
+            processor.get_examples(data_dir=data_dir, set_type=data_set_type)
         )
         features = glue_convert_examples_to_features(
             examples,
             tokenizer,
+            framework_name,
             label_list=label_list,
             max_length=max_seq_length,
             output_mode=output_mode,

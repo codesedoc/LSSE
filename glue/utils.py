@@ -22,9 +22,54 @@ from torch.optim import Optimizer
 import math
 import torch
 from torch.optim.lr_scheduler import LambdaLR
+import utils.file_tool as file_tool
 
 
 logger = logging.getLogger(__name__)
+
+
+class InputSentence(object):
+    def __init__(self, guid, original):
+        self.guid = guid
+        self.original = original
+        self.parsed_info = None
+        self.syntax_info = None
+
+    def __repr__(self):
+        return str(self.to_json_string())
+
+    def to_dict(self):
+        """Serializes this instance to a Python dictionary."""
+        output = copy.deepcopy(self.__dict__)
+        return output
+
+    def to_json_string(self):
+        """Serializes this instance to a JSON string."""
+        return json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n"
+
+    def len_of_tokens(self):
+        return len(self.parsed_info['words'].copy())
+
+    def word_tokens(self):
+        return self.parsed_info['words'].copy()
+
+    def word_tokens_uncased(self):
+        result = self.parsed_info['words'].copy()
+        for i, _ in enumerate(result):
+            result[i] = result[i].lower()
+        return result
+
+    def original_sentence(self):
+        return self.original
+
+    def sentence_with_root_head(self):
+        return 'root ' + self.original
+
+    def original_sentence_uncased(self):
+        return self.original.lower()
+
+    def numeral_dependencies(self):
+        return self.syntax_info['dependencies'].copy()
 
 
 class InputExample(object):
@@ -41,10 +86,17 @@ class InputExample(object):
             specified for train and dev examples, but not for test examples.
     """
 
-    def __init__(self, guid, text_a, text_b=None, label=None):
+    def __init__(self, guid, sent_a, sent_b=None, label=None):
         self.guid = guid
-        self.text_a = text_a
-        self.text_b = text_b
+        self.text_a = sent_a.original_sentence()
+
+        if sent_b is not None:
+            self.text_b = sent_b.original_sentence()
+        else:
+            self.text_b = None
+
+        self.sent_a = sent_a
+        self.sent_b = sent_b
         self.label = label
 
     def __repr__(self):
@@ -211,6 +263,84 @@ class LSSEInputFeatures(InputFeatures):
 
 class DataProcessor(object):
     """Base class for data converters for sequence classification data sets."""
+    data_path = None
+
+    def __init__(self):
+        self.sentence_dict = None
+        self.type2sentence_dict = {'train': None, 'test': None, 'dev': None}
+        self.get_all_sentence_dict()
+
+        self.example_dict = None
+        self.type2examples = {'train': None, 'test': None, 'dev': None}
+        self.get_all_example_dict()
+
+    def get_all_sentence_dict(self):
+        if self.sentence_dict is None:
+            train_sentence_dict = self.get_sentence_dict(set_type='train')
+            test_sentence_dict = self.get_sentence_dict(set_type='test')
+            dev_sentence_dict = self.get_sentence_dict(set_type='dev')
+            self.sentence_dict = {}
+            self.sentence_dict.update(train_sentence_dict)
+            self.sentence_dict.update(test_sentence_dict)
+            self.sentence_dict.update(dev_sentence_dict)
+            sent_filename = file_tool.connect_path(self.data_path, 'original_sentence.txt')
+            self.output_sentences(sent_filename)
+            self.org_sent2id_dict = {}
+            for s_id, sent in self.sentence_dict.items():
+                self.org_sent2id_dict[sent.original_sentence()] = s_id
+        return self.sentence_dict
+
+    def get_all_example_dict(self):
+        def example_dict_from_examples(examples):
+            example_dict = {}
+            for e in examples:
+                example_dict[str(e.guid)] = e
+            if len(examples) != len(example_dict):
+                raise ValueError
+            return example_dict
+
+        if self.example_dict is None:
+            train_examples = self.get_examples(set_type='train')
+            test_examples = self.get_examples(set_type='test')
+            dev_examples = self.get_examples(set_type='dev')
+
+            self.example_dict = {}
+            self.example_dict.update(example_dict_from_examples(train_examples))
+            self.example_dict.update(example_dict_from_examples(test_examples))
+            self.example_dict.update(example_dict_from_examples(dev_examples))
+
+        return self.example_dict
+
+    def get_examples(self, data_dir=None, set_type='train'):
+
+        if set_type not in self.type2examples:
+            raise ValueError
+
+        if not data_dir:
+            data_dir = self.data_path
+        data_file = file_tool.connect_path(data_dir, '%s.tsv' % set_type)
+
+        examples = self.type2examples[set_type]
+        if examples is None:
+            examples = self._create_examples(self._read_tsv(data_file), set_type)
+            self.type2examples[set_type] = examples
+
+        return examples
+
+    def get_sentence_dict(self, data_dir=None, set_type='train'):
+        if set_type not in self.type2sentence_dict:
+            raise ValueError
+
+        if not data_dir:
+            data_dir = self.data_path
+        data_file = file_tool.connect_path(data_dir, '%s.tsv' % set_type)
+
+        sentence_dict = self.type2sentence_dict[set_type]
+        if sentence_dict is None:
+            sentence_dict = self._create_sentence_dict(self._read_tsv(data_file), set_type)
+            self.type2sentence_dict[set_type] = sentence_dict
+
+        return sentence_dict
 
     def get_example_from_tensor_dict(self, tensor_dict):
         """Gets an example from a dict with tensorflow tensors
@@ -220,12 +350,10 @@ class DataProcessor(object):
         """
         raise NotImplementedError()
 
-    def get_train_examples(self, data_dir):
-        """Gets a collection of `InputExample`s for the train set."""
+    def _create_examples(self, lines, set_type):
         raise NotImplementedError()
 
-    def get_dev_examples(self, data_dir):
-        """Gets a collection of `InputExample`s for the dev set."""
+    def _create_sentence_dict(self, lines, set_type):
         raise NotImplementedError()
 
     def get_labels(self):
@@ -238,6 +366,24 @@ class DataProcessor(object):
         if len(self.get_labels()) > 1:
             example.label = self.get_labels()[int(example.label)]
         return example
+
+    def output_sentences(self, filename):
+        logger.debug('Output sentences')
+        sentence_dict = self.sentence_dict.copy()
+        save_data = []
+        for sent_id, sent in sentence_dict.items():
+            save_data.append('{}\t{}'.format(sent_id, sent.original_sentence()))
+        file_tool.save_list_data(save_data, filename, 'w')
+
+    def _org_sent2sent_obj_dict(self, sentence_dict):
+        result = {}
+        for s_id, sent in sentence_dict.items():
+            result[sent.original_sentence()] = sent
+
+        if len(result) != len(sentence_dict):
+            raise ValueError
+
+        return result
 
     @classmethod
     def _read_tsv(cls, input_file, quotechar=None):

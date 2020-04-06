@@ -5,6 +5,16 @@ import random
 import utils.file_tool as file_tool
 
 
+def singleton(cls):
+    _instance = None
+    def _singleton(*args, **kargs):
+        nonlocal _instance
+        if _instance == None:
+            _instance = cls(*args, **kargs)
+        return _instance
+    # print('id{}'.format(id(_singleton)))
+    return _singleton
+
 def compare_two_dict_keys(dict1, dict2):
     for key in dict1.keys():
         if key not in dict2:

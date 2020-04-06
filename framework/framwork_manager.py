@@ -376,6 +376,7 @@ class FrameworkManager:
                 task=self.args.task_name,
                 tokenizer=self.tokenizer,
                 model_type=self.args.model_type,
+                framework_name=self.args.framework_name,
                 model_name_or_path=self.args.model_name_or_path,
                 evaluate=False,
                 max_seq_length=self.args.max_seq_length,
