@@ -43,7 +43,7 @@ class FrameworkManager:
         self.args.output_mode = glue.glue_output_modes[self.args.task_name]
         label_list = processor.get_labels()
         self.args.num_labels = len(label_list)
-
+        self.args.dep_kind_count = processor.parse_info.dependency_count
         # Create framework
         self.create_framework()
 
@@ -218,12 +218,19 @@ class FrameworkManager:
                     continue
 
                 model.train()
-                batch = tuple(t.to(self.args.device) for t in batch)
-                inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
-                if self.args.model_type != "distilbert":
-                    inputs["token_type_ids"] = (
-                        batch[2] if self.args.model_type in ["bert", "xlnet", "albert"] else None
-                    )  # XLM, DistilBERT, RoBERTa, and XLM-RoBERTa don't use segment_ids
+                # for b in batch:
+                #     print(type(b))
+                # batch = tuple(t.to(self.args.device) for t in batch)
+                # inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
+                inputs = batch
+                if self.args.model_type != "distilbert" and self.args.model_type not in ["bert", "xlnet", "albert"] :
+                    del inputs["token_type_ids"]
+                for key, t in inputs.items():
+                    inputs[key] = t.to(self.args.device)
+                # if self.args.model_type != "distilbert":
+                #     inputs["token_type_ids"] = (
+                #         batch[2] if self.args.model_type in ["bert", "xlnet", "albert"] else None
+                #     )  # XLM, DistilBERT, RoBERTa, and XLM-RoBERTa don't use segment_ids
                 outputs = model(**inputs)
                 loss = outputs[0]  # model outputs are always tuple in transformers (see doc)
                 loss_list.append(loss.item())
@@ -298,9 +305,11 @@ class FrameworkManager:
         results = {}
         for eval_task, eval_output_dir in zip(eval_task_names, eval_outputs_dirs):
             eval_dataset = glue.load_and_cache_examples(
+                args=self.args,
                 task = eval_task,
                 tokenizer = self.tokenizer,
                 model_type = self.args.model_type,
+                framework_name=self.args.framework_name,
                 model_name_or_path = self.args.model_name_or_path,
                 evaluate=True,
                 max_seq_length=self.args.max_seq_length,
@@ -331,14 +340,13 @@ class FrameworkManager:
             out_label_ids = None
             for batch in tqdm(eval_dataloader, desc="Evaluating"):
                 model.eval()
-                batch = tuple(t.to(self.args.device) for t in batch)
-
+                inputs = batch
                 with torch.no_grad():
-                    inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
-                    if self.args.model_type != "distilbert":
-                        inputs["token_type_ids"] = (
-                            batch[2] if self.args.model_type in ["bert", "xlnet", "albert"] else None
-                        )  # XLM, DistilBERT, RoBERTa, and XLM-RoBERTa don't use segment_ids
+                    if self.args.model_type != "distilbert" and self.args.model_type not in ["bert", "xlnet", "albert"]:
+                        del inputs["token_type_ids"]
+                    for key, t in inputs.items():
+                        inputs[key] = t.to(self.args.device)
+
                     outputs = model(**inputs)
                     tmp_eval_loss, logits = outputs
 
@@ -373,6 +381,7 @@ class FrameworkManager:
         # Training
         if self.args.do_train:
             train_dataset = glue.load_and_cache_examples(
+                args=self.args,
                 task=self.args.task_name,
                 tokenizer=self.tokenizer,
                 model_type=self.args.model_type,

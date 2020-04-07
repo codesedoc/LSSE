@@ -18,10 +18,12 @@
 import logging
 import os
 
-from glue.utils import DataProcessor, InputExample, InputFeatures
+from glue.utils import DataProcessor, InputExample, InputFeatures, InputFeaturesWithGCN, TensorDictDataset
 import torch
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
 from glue.mrpc import MrpcProcessor
+import utils.general_tool as general_tool
+from transformers import glue_compute_metrics as compute_metrics
 
 
 logger = logging.getLogger(__name__)
@@ -67,6 +69,7 @@ glue_output_modes = {
 
 
 def glue_convert_examples_to_features(
+    args,
     examples,
     tokenizer,
     framework_name,
@@ -155,6 +158,24 @@ def glue_convert_examples_to_features(
         else:
             raise KeyError(output_mode)
 
+        sep_indexes = []
+        sep_token = tokenizer.convert_tokens_to_ids([tokenizer.sep_token])[0]
+        for sep_index, id_ in enumerate(input_ids.copy()):
+            if id_ == sep_token:
+                sep_indexes.append(sep_index)
+
+        if len(sep_indexes) != 2:
+            raise ValueError
+
+        sep_index = sep_indexes[0]
+        text_a_len = sep_indexes[0] - 1
+        text_b_len = sep_indexes[1] - sep_indexes[0] - 1
+
+        word_piece_flags = general_tool.word_piece_flag_list(tokenizer.convert_ids_to_tokens(input_ids.copy()), '##')
+
+        if text_a_len <= 0 or text_b_len <= 0:
+            raise ValueError
+
         if ex_index < 5:
             logger.info("*** Example ***")
             logger.info("guid: %s" % (example.guid))
@@ -164,8 +185,11 @@ def glue_convert_examples_to_features(
             logger.info("label: %s (id = %d)" % (example.label, label))
 
         features.append(
-            InputFeatures(
-                input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids, label=label
+            InputFeaturesWithGCN(
+                args,
+                input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids, label=label,
+                example=example, sep_index=sep_index, text_a_len=text_a_len, text_b_len=text_b_len,
+                word_piece_flags=word_piece_flags
             )
         )
 
@@ -484,6 +508,7 @@ def glue_convert_examples_to_features(
 
 
 def load_and_cache_examples(
+        args,
         task,
         tokenizer,
         model_type,
@@ -538,6 +563,7 @@ def load_and_cache_examples(
             processor.get_examples(data_dir=data_dir, set_type=data_set_type)
         )
         features = glue_convert_examples_to_features(
+            args,
             examples,
             tokenizer,
             framework_name,
@@ -567,7 +593,34 @@ def load_and_cache_examples(
         all_labels = None
         raise ValueError
 
-    dataset = TensorDataset(all_input_ids, all_attention_mask, all_token_type_ids, all_labels)
+    all_sep_index = torch.tensor([f.sep_index for f in features], dtype=torch.int)
+    all_word_piece_flags = torch.tensor([f.word_piece_flags for f in features], dtype=torch.int)
+    all_text_a_org_len = torch.tensor([f.text_a_org_len for f in features], dtype=torch.int)
+    all_text_a_len = torch.tensor([f.text_a_len for f in features], dtype=torch.int)
+    all_adj_matrix_a = torch.tensor([f.adj_matrix_a for f in features], dtype=torch.int)
+    all_sent_a_id = torch.tensor([f.sent_a_id for f in features], dtype=torch.int)
+
+    all_text_b_org_len = torch.tensor([f.text_b_org_len for f in features], dtype=torch.int)
+    all_text_b_len = torch.tensor([f.text_b_len for f in features], dtype=torch.int)
+    all_adj_matrix_b = torch.tensor([f.adj_matrix_b for f in features], dtype=torch.int)
+
+    dataset_item = {
+        'input_ids': all_input_ids,
+        'attention_mask': all_attention_mask,
+        'token_type_ids': all_token_type_ids,
+        'labels': all_labels,
+        'sep_index': all_sep_index,
+        'word_piece_flags': all_word_piece_flags,
+        'sent1_org_len': all_text_a_org_len,
+        'sent1_len': all_text_a_len,
+        'adj_matrix1': all_adj_matrix_a,
+        'sent1_id': all_sent_a_id,
+        'sent2_org_len': all_text_b_org_len,
+        'sent2_len': all_text_b_len,
+        'adj_matrix2': all_adj_matrix_b,
+    }
+
+    # dataset = TensorDataset(all_input_ids, all_attention_mask, all_token_type_ids, all_labels)
+    dataset = TensorDictDataset(dataset_item)
     return dataset
 
-from transformers import glue_compute_metrics as compute_metrics

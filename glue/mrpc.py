@@ -33,7 +33,6 @@ class MrpcProcessor(DataProcessor):
         """Creates examples for the training and dev sets."""
         logger.info('Load {} set.'.format(set_type))
         examples = []
-        org_sent2sent_obj_dict = self._org_sent2sent_obj_dict(self.type2sentence_dict[set_type])
         for (i, line) in enumerate(lines):
             if i == 0:
                 continue
@@ -41,8 +40,8 @@ class MrpcProcessor(DataProcessor):
             org_sent_a = line[3]
             org_sent_b = line[4]
 
-            sent_a = org_sent2sent_obj_dict[org_sent_a]
-            sent_b = org_sent2sent_obj_dict[org_sent_b]
+            sent_a = self.org_sent2sent_obj_dict[org_sent_a]
+            sent_b = self.org_sent2sent_obj_dict[org_sent_b]
 
             label = line[0]
             examples.append(InputExample(guid=guid, sent_a=sent_a, sent_b=sent_b, label=label))

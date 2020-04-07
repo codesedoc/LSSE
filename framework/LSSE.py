@@ -17,15 +17,19 @@ class LSSE(fr.Framework):
     result_path = file_tool.connect_path('result', name)
 
     def __init__(self, args):
-        super().__init__(args)
-        self.name = LSSE.name
-        self.result_path = LSSE.result_path
         self.encoder = None
         self.encoder_dropout = None
         self.gcn = None
         self.semantic_layer = None
         self.fully_connection = None
-        self.args.fully_scales = [self.args.gcn_hidden_dim * 2, 2]
+        args.gcn_group_layer_limit_flag = False
+        args.gcn_layer = 2
+        args.fully_scales = [args.gcn_hidden_dim * 2, 2]
+        super().__init__(args)
+        self.name = LSSE.name
+        self.result_path = LSSE.result_path
+
+
     @classmethod
     def framework_name(cls):
         return cls.name
