@@ -5,8 +5,8 @@ import numpy as np
 
 
 class SemanticLayer(torch.nn.Module):
-    def __init__(self, arg_dict):
-        self.arg_dict = arg_dict
+    def __init__(self, args):
+        self.args = args
         super().__init__()
 
     def revise_zero_data(self, tensor):
@@ -18,13 +18,13 @@ class SemanticLayer(torch.nn.Module):
     def forward(self, sentence1s, sentence2s, sentence1_lens=None, sentence2_lens=None):
         sentence1s = sentence1s.float()
         sentence2s = sentence2s.float()
-        if self.arg_dict['semantic_compare_func'] == 'l2':
+        if self.args.semantic_compare_func == 'l2':
             result = self.l2distance(sentence1s, sentence2s)
 
-        elif self.arg_dict['semantic_compare_func'] == 'arccos':
+        elif self.args.semantic_compare_func == 'arccos':
             result = self.calculate_arc_cos(sentence1s, sentence2s)
 
-        elif self.arg_dict['semantic_compare_func'] == 'wmd':
+        elif self.args.semantic_compare_func == 'wmd':
             result = self.word_mover_distance(sentence1s, sentence2s, sentence1_lens, sentence2_lens)
 
         else:

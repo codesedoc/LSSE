@@ -120,7 +120,6 @@ def glue_convert_examples_to_features(
 
     features = []
     for (ex_index, example) in enumerate(examples):
-        len_examples = 0
         len_examples = len(examples)
         if ex_index % 10000 == 0:
             logger.info("Writing example %d/%d" % (ex_index, len_examples))
@@ -184,13 +183,22 @@ def glue_convert_examples_to_features(
             logger.info("token_type_ids: %s" % " ".join([str(x) for x in token_type_ids]))
             logger.info("label: %s (id = %d)" % (example.label, label))
 
-        features.append(
-            InputFeaturesWithGCN(
+        if args.framework_name in ['LSSE', 'LSyE']:
+            input_feature = InputFeaturesWithGCN(
                 args,
                 input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids, label=label,
                 example=example, sep_index=sep_index, text_a_len=text_a_len, text_b_len=text_b_len,
                 word_piece_flags=word_piece_flags
             )
+        else:
+            input_feature = InputFeatures(
+                args,
+                input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids, label=label,
+                example=example,
+            )
+
+        features.append(
+            input_feature
         )
 
     return features
@@ -543,7 +551,8 @@ def load_and_cache_examples(
     # Load data features from cache or dataset file
     cached_features_file = os.path.join(
         data_dir,
-        "cached_{}_{}_{}_{}".format(
+        "cached_{}_{}_{}_{}_{}".format(
+            args.framework_name,
             data_set_type,
             list(filter(None, model_name_or_path.split("/"))).pop(),
             str(max_seq_length),
@@ -559,9 +568,13 @@ def load_and_cache_examples(
         if task in ["mnli", "mnli-mm"] and model_type in ["roberta", "xlmroberta"]:
             # HACK(label indices are swapped in RoBERTa pretrained model)
             label_list[1], label_list[2] = label_list[2], label_list[1]
+
         examples = (
             processor.get_examples(data_dir=data_dir, set_type=data_set_type)
         )
+        if args.framework_name in args.framework_with_gcn:
+            processor.add_root_to_text_of_example()
+
         features = glue_convert_examples_to_features(
             args,
             examples,
@@ -592,33 +605,44 @@ def load_and_cache_examples(
     else:
         all_labels = None
         raise ValueError
-
-    all_sep_index = torch.tensor([f.sep_index for f in features], dtype=torch.int)
-    all_word_piece_flags = torch.tensor([f.word_piece_flags for f in features], dtype=torch.int)
-    all_text_a_org_len = torch.tensor([f.text_a_org_len for f in features], dtype=torch.int)
-    all_text_a_len = torch.tensor([f.text_a_len for f in features], dtype=torch.int)
-    all_adj_matrix_a = torch.tensor([f.adj_matrix_a for f in features], dtype=torch.int)
-    all_sent_a_id = torch.tensor([f.sent_a_id for f in features], dtype=torch.int)
-
-    all_text_b_org_len = torch.tensor([f.text_b_org_len for f in features], dtype=torch.int)
-    all_text_b_len = torch.tensor([f.text_b_len for f in features], dtype=torch.int)
-    all_adj_matrix_b = torch.tensor([f.adj_matrix_b for f in features], dtype=torch.int)
-
     dataset_item = {
-        'input_ids': all_input_ids,
-        'attention_mask': all_attention_mask,
-        'token_type_ids': all_token_type_ids,
-        'labels': all_labels,
-        'sep_index': all_sep_index,
-        'word_piece_flags': all_word_piece_flags,
-        'sent1_org_len': all_text_a_org_len,
-        'sent1_len': all_text_a_len,
-        'adj_matrix1': all_adj_matrix_a,
-        'sent1_id': all_sent_a_id,
-        'sent2_org_len': all_text_b_org_len,
-        'sent2_len': all_text_b_len,
-        'adj_matrix2': all_adj_matrix_b,
+        'e_id':  torch.tensor([f.e_id for f in features], dtype=torch.int)
     }
+    if args.framework_name in ['LSSE', 'LSyE']:
+        all_sep_index = torch.tensor([f.sep_index for f in features], dtype=torch.int)
+        all_word_piece_flags = torch.tensor([f.word_piece_flags for f in features], dtype=torch.int)
+        all_text_a_org_len = torch.tensor([f.text_a_org_len for f in features], dtype=torch.int)
+        all_text_a_len = torch.tensor([f.text_a_len for f in features], dtype=torch.int)
+        all_adj_matrix_a = torch.tensor([f.adj_matrix_a for f in features], dtype=torch.int)
+        all_sent_a_id = torch.tensor([f.sent_a_id for f in features], dtype=torch.int)
+
+        all_text_b_org_len = torch.tensor([f.text_b_org_len for f in features], dtype=torch.int)
+        all_text_b_len = torch.tensor([f.text_b_len for f in features], dtype=torch.int)
+        all_adj_matrix_b = torch.tensor([f.adj_matrix_b for f in features], dtype=torch.int)
+
+        dataset_item.update({
+            'input_ids': all_input_ids,
+            'attention_mask': all_attention_mask,
+            'token_type_ids': all_token_type_ids,
+            'labels': all_labels,
+            'sep_index': all_sep_index,
+            'word_piece_flags': all_word_piece_flags,
+            'sent1_org_len': all_text_a_org_len,
+            'sent1_len': all_text_a_len,
+            'adj_matrix1': all_adj_matrix_a,
+            'sent1_id': all_sent_a_id,
+            'sent2_org_len': all_text_b_org_len,
+            'sent2_len': all_text_b_len,
+            'adj_matrix2': all_adj_matrix_b,
+        })
+
+    else:
+        dataset_item.update({
+            'input_ids': all_input_ids,
+            'attention_mask': all_attention_mask,
+            'token_type_ids': all_token_type_ids,
+            'labels': all_labels
+        })
 
     # dataset = TensorDataset(all_input_ids, all_attention_mask, all_token_type_ids, all_labels)
     dataset = TensorDictDataset(dataset_item)

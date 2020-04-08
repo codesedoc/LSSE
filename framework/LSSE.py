@@ -22,14 +22,25 @@ class LSSE(fr.Framework):
         self.gcn = None
         self.semantic_layer = None
         self.fully_connection = None
-        args.gcn_group_layer_limit_flag = False
         args.gcn_layer = 2
+        args.gcn_gate_flag = True
+        args.gcn_norm_item = 0.5
+        args.gcn_self_loop_flag = True
+        args.gcn_group_layer_limit_flag = False
+        if args.gcn_group_layer_limit_flag:
+            args.gcn_dep_layer_limit_list = [6, 5, 4, 3, 2]
+
+        args.gcn_dropout = 1.0
+        args.gcn_position_encoding_flag = True
+
         args.fully_scales = [args.gcn_hidden_dim * 2, 2]
+
         super().__init__(args)
         self.name = LSSE.name
         self.result_path = LSSE.result_path
-
-
+        self.position_encoding_flag = self.args.gcn_position_encoding_flag
+        self.data_type = torch.float32
+        self.device = self.args.device
     @classmethod
     def framework_name(cls):
         return cls.name
@@ -232,6 +243,7 @@ class LSSE(fr.Framework):
 
     def forward(self, *input_data, **kwargs):
         data_batch = kwargs
+        example_id_batch = data_batch['e_id']
         input_ids_batch = data_batch['input_ids']
         token_type_ids_batch = data_batch['token_type_ids']
         attention_mask_batch = data_batch['attention_mask']
@@ -250,7 +262,7 @@ class LSSE(fr.Framework):
         sent1_id_batch = data_batch['sent1_id']
 
 
-        last_hidden_states_batch, pooled_output = self.bert(input_ids_batch, token_type_ids_batch, attention_mask_batch)
+        last_hidden_states_batch, pooled_output = self.encoder(input_ids_batch, token_type_ids_batch, attention_mask_batch)
         pooled_output = self.encoder_dropout(pooled_output)
 
         sent1_states_batch = []
@@ -269,8 +281,8 @@ class LSSE(fr.Framework):
             if len(sent1_states) + len(sent2_states) + 3 != attention_mask_batch[i].sum():
                 raise ValueError
 
-            if len(word_piece_flags_batch[i]) != attention_mask_batch[i].sum():
-                raise ValueError
+            # if len(word_piece_flags_batch[i]) != attention_mask_batch[i].sum():
+            #     raise ValueError
             # sent1_states_temp = torch.tensor(sent1_states)
             sent1_states = self.merge_reps_of_word_pieces(sent1_word_piece_flags, sent1_states)
 
@@ -294,14 +306,14 @@ class LSSE(fr.Framework):
         sent2_states_batch = torch.stack(sent2_states_batch, dim=0)
 
         def get_position_es(shape):
-            position_encodings = general_tool.get_global_position_encodings(length=self.arg_dict['max_sentence_length'],
-                                                                            dimension=self.arg_dict['bert_hidden_dim'])
+            position_encodings = general_tool.get_global_position_encodings(length=self.args.max_sentence_length,
+                                                                            dimension=self.args.gcn_hidden_dim)
             position_encodings = position_encodings[:shape[1]]
             position_encodings = torch.tensor(position_encodings, dtype=self.data_type,
                                               device=self.device).expand([shape[0], -1, -1])
             return position_encodings
 
-        if self.arg_dict['position_encoding']:
+        if self.position_encoding_flag:
             shape1 = sent1_states_batch.size()
             position_es1 = get_position_es(shape1)
             shape2 = sent2_states_batch.size()
@@ -312,25 +324,35 @@ class LSSE(fr.Framework):
         # star_time = time.time()
         gcn_out1 = self.gcn(sent1_states_batch, adj_matrix1_batch)
         gcn_out2 = self.gcn(sent2_states_batch, adj_matrix2_batch)
-        if self.arg_dict['concatenate_input_for_gcn_hidden']:
+
+        if not self.args.without_concatenate_input_for_gcn_hidden:
             gcn_out1 = torch.cat([gcn_out1, sent1_states_batch], dim=2)
             gcn_out2 = torch.cat([gcn_out2, sent2_states_batch], dim=2)
         result = self.semantic_layer(gcn_out1, gcn_out2, sent1_org_len_batch, sent2_org_len_batch)
         result = torch.cat([pooled_output, result], dim=1)
 
-        result = self.fully_connection(result)
+        predicts = self.fully_connection(result)
 
-        if self.arg_dict['task_type'] == 'classification':
-            loss = torch.nn.CrossEntropyLoss()(result.view(-1, 2), labels.view(-1))
-            predicts = np.array(result.detach().cpu().numpy()).argmax(axis=1)
+        # if self.args.output_mode == 'classification':
+        #     loss = torch.nn.CrossEntropyLoss()(result.view(-1, 2), labels.view(-1))
+        #     predicts = np.array(result.detach().cpu().numpy()).argmax(axis=1)
+        #
+        # elif self.args.output_mode == 'regression':
+        #     loss = torch.nn.MSELoss()(result.view(-1), labels.view(-1))
+        #     predicts = np.array(result.detach().cpu().numpy().copy()).reshape(-1)
+        # else:
+        #     raise ValueError
 
-        elif self.arg_dict['task_type'] == 'regression':
-            loss = torch.nn.MSELoss()(result.view(-1), labels.view(-1))
-            predicts = np.array(result.detach().cpu().numpy().copy()).reshape(-1)
+        if self.args.num_labels > 1:
+            loss = torch.nn.CrossEntropyLoss()(predicts.view(-1, 2), labels.view(-1))
+        elif self.args.num_labels == 1:
+            loss = torch.nn.MSELoss()(predicts.view(-1), labels.view(-1))
         else:
             raise ValueError
 
-        return loss, predicts
+        outputs = loss, predicts
+
+        return outputs
 
     # def get_regular_parts(self):
     #     regular_part_list = (self.gcn, self.fully_connection, self.bert)

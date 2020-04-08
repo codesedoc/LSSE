@@ -2,30 +2,26 @@ import torch
 
 
 class GCN(torch.nn.Module):
-    def __init__(self, arg_dict):
+    def __init__(self, args):
         super().__init__()
-        self.arg_dict = arg_dict
-        self.layer = arg_dict['gcn_layer']
-        self.dep_kind_count = arg_dict['dep_kind_count']
+        self.args = args
+        self.layer = args.gcn_layer
+        self.dep_kind_count = args.dep_kind_count
         # self.relation_number = arg_dict['gcn_relation_number']
-        self.gate_flag = arg_dict['gcn_gate_flag']
-        self.norm_item = arg_dict['gcn_norm_item']
-        self.self_loop_flag = arg_dict['gcn_self_loop_flag']
+        self.gate_flag = args.gcn_gate_flag
+        self.norm_item = args.gcn_norm_item
+        self.self_loop_flag = args.gcn_self_loop_flag
         # word_embedding_dim = arg_dict['word_embedding_dim']
-        self.hidden_dim = arg_dict['gcn_hidden_dim']
-        self.group_layer_limit_flag = arg_dict['group_layer_limit_flag']
+        self.hidden_dim = args.gcn_hidden_dim
+        self.group_layer_limit_flag = args.gcn_group_layer_limit_flag
         if self.group_layer_limit_flag:
-            self.dep_layer_limit_list = arg_dict['dep_layer_limit_list']
+            self.dep_layer_limit_list = args.dep_layer_limit_list
         self.gate_activity = torch.sigmoid
         self.activity = torch.relu
-        if self.arg_dict['dropout'] != 1.0:
-            self.dropout = torch.nn.Dropout(self.arg_dict['dropout'])
+        if args.gcn_dropout != 1.0:
+            self.dropout = torch.nn.Dropout(args.gcn_dropout)
 
-        gpu_id = arg_dict['ues_gpu']
-        if gpu_id == -1:
-            self.device = torch.device('cpu')
-        else:
-            self.device = torch.device('cuda', gpu_id)
+        self.device = args.device
 
         self.weight_in_list = torch.nn.ParameterList(self.get_para_list(self.layer * self.dep_kind_count,
                                                                         (self.hidden_dim, self.hidden_dim)))
@@ -62,6 +58,7 @@ class GCN(torch.nn.Module):
             for i in range(length)]
 
     def forward(self, sentences, adj_matrix):
+        adj_matrix = adj_matrix.to(dtype=sentences.dtype)
         def calculate_convolution(weight_gate_list, bias_gate_list, weight_list, bias_list, index, d_kind, adj_matrix,
                                   h):
             if self.gate_flag:

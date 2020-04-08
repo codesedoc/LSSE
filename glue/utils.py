@@ -66,8 +66,12 @@ class InputSentence(object):
         """Serializes this instance to a JSON string."""
         return json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n"
 
+    #count with ROOT
     def len_of_tokens(self):
-        return len(self.parsed_info['words'].copy())
+        result = len(self.parsed_info['words'].copy())
+        # if self.parsed_info['has_root']:
+        #     result -= 1
+        return result
 
     def word_tokens(self):
         return self.parsed_info['words'].copy()
@@ -105,10 +109,11 @@ class InputExample(object):
             specified for train and dev examples, but not for test examples.
     """
 
-    def __init__(self, guid, sent_a, sent_b=None, label=None):
+    def __init__(self, guid, id, sent_a, sent_b=None, label=None):
         self.guid = guid
+        self.id = id
+        self.with_root_head = False
         self.text_a = sent_a.original_sentence()
-
         if sent_b is not None:
             self.text_b = sent_b.original_sentence()
         else:
@@ -117,6 +122,14 @@ class InputExample(object):
         self.sent_a = sent_a
         self.sent_b = sent_b
         self.label = label
+
+    def add_root_to_text(self):
+        if not self.with_root_head:
+            self.text_a = self.sent_a.sentence_with_root_head()
+            self.text_b = self.sent_b.sentence_with_root_head()
+            self.with_root_head = True
+        else:
+            print('already add')
 
     def __repr__(self):
         return str(self.to_json_string())
@@ -146,6 +159,8 @@ class InputFeatures(object):
 
     def __init__(self, args, **kwargs):
         self.args = args
+        self.example = kwargs['example']
+        self.e_id = self.example.id
         self.input_ids = kwargs['input_ids']
         self.attention_mask = kwargs['attention_mask']
         self.token_type_ids = kwargs['token_type_ids']
@@ -166,19 +181,6 @@ class InputFeatures(object):
 class InputFeaturesWithGCN(InputFeatures):
     def __init__(self, args, **kwargs):
         super().__init__(args, **kwargs)
-        self.example = kwargs['example']
-
-
-        # examples = [example_dict[str(e_id.item())] for e_id in example_ids]
-        # sentence_max_len = self.arg_dict['sentence_max_len_for_bert']
-        # pad_on_right = self.arg_dict['pad_on_right']
-        # pad_token = self.bert.tokenizer.convert_tokens_to_ids([self.bert.tokenizer.pad_token])[0]
-        # sep_token = self.bert.tokenizer.convert_tokens_to_ids([self.bert.tokenizer.sep_token])[0]
-        # mask_padding_with_zero = True
-        # pad_token_segment_id = 0
-
-        # sentence1s = [e.sentence1 for e in examples]
-        # sentence2s = [e.sentence2 for e in examples]
         self.adj_matrix_a = parser_tool.dependencies2adj_matrix(self.example.sent_a.syntax_info['dependencies'],
                                                                 self.args.dep_kind_count,
                                                                 self.args.max_sentence_length)
@@ -190,105 +192,13 @@ class InputFeaturesWithGCN(InputFeatures):
 
         self.text_a_len = kwargs['text_a_len']
         self.text_a_org_len = self.example.sent_a.len_of_tokens()
-        self.sent_a_id = self.example.sent_a.id
+        self.sent_a_id = self.example.sent_a.guid
 
         self.text_b_len = kwargs['text_b_len']
         self.text_b_org_len = self.example.sent_b.len_of_tokens()
 
         self.word_piece_flags = kwargs['word_piece_flags']
 
-        # def get_adj_matrix_batch(sentences):
-        #     adj_matrixs = []
-        #     for s in sentences:
-        #         adj_matrixs.append(parser_tool.dependencies2adj_matrix(s.syntax_info['dependencies'],
-        #                                                                self.arg_dict['dep_kind_count'],
-        #                                                                self.arg_dict['max_sentence_length']))
-        #     return torch.from_numpy(np.array(adj_matrixs)).to(device=self.device, dtype=self.data_type)
-
-        # adj_matrix1_batch = get_adj_matrix_batch(sentence1s)
-        # adj_matrix2_batch = get_adj_matrix_batch(sentence2s)
-
-        # if self.arg_dict['task_type'] == 'classification':
-        #     labels = torch.tensor([e.label for e in examples], dtype=torch.long, device=self.device)
-        # elif self.arg_dict['task_type'] == 'regression':
-        #     labels = torch.tensor([e.label for e in examples], dtype=self.data_type, device=self.device)
-
-        # input_ids_batch = []
-        # token_type_ids_batch = []
-        # attention_mask_batch = []
-        # sep_index_batch = []
-        # sent1_len_batch = []
-        # sent2_len_batch = []
-        # word_piece_flags_batch = []
-        # sent1_org_len_batch = []
-        # sent2_org_len_batch = []
-        # sent1_id_batch = []
-        # for s1, s2 in zip(sentence1s, sentence2s):
-        #     inputs_ls_cased = self.bert.tokenizer.encode_plus(s1.sentence_with_root_head(), s2.sentence_with_root_head(),
-        #                                                           add_special_tokens=True,
-        #                                                           max_length=sentence_max_len, )
-        #     input_ids, token_type_ids = inputs_ls_cased["input_ids"], inputs_ls_cased["token_type_ids"]
-        #
-        #     word_piece_flags_batch.append(general_tool.word_piece_flag_list(self.bert.tokenizer.convert_ids_to_tokens(input_ids), '##'))
-        #
-        #     attention_mask = [1 if mask_padding_with_zero else 0] * len(input_ids)
-        #
-        #     padding_length = sentence_max_len - len(input_ids)
-        #     if not pad_on_right:
-        #         input_ids = ([pad_token] * padding_length) + input_ids
-        #         attention_mask = ([0 if mask_padding_with_zero else 1] * padding_length) + attention_mask
-        #         token_type_ids = ([pad_token_segment_id] * padding_length) + token_type_ids
-        #     else:
-        #         input_ids = input_ids + ([pad_token] * padding_length)
-        #         attention_mask = attention_mask + ([0 if mask_padding_with_zero else 1] * padding_length)
-        #         token_type_ids = token_type_ids + ([pad_token_segment_id] * padding_length)
-        #
-        #     input_ids_batch.append(input_ids)
-        #     token_type_ids_batch.append(token_type_ids)
-        #     attention_mask_batch.append(attention_mask)
-        #
-        #     sep_indexes = []
-        #
-        #     for sep_index, id_ in enumerate(input_ids.copy()):
-        #         if id_ == sep_token:
-        #             sep_indexes.append(sep_index)
-        #
-        #     if len(sep_indexes) != 2:
-        #         raise ValueError
-        #
-        #     sep_index_batch.append(sep_indexes[0])
-        #     sent1_len_batch.append(sep_indexes[0]-1)
-        #     sent2_len_batch.append(sep_indexes[1] - sep_indexes[0] - 1)
-        #
-        #
-        #
-        # input_ids_batch = torch.tensor(input_ids_batch, device=self.device)
-        # token_type_ids_batch = torch.tensor(token_type_ids_batch, device=self.device)
-        # attention_mask_batch = torch.tensor(attention_mask_batch, device=self.device)
-        #
-        #
-        #
-        # result = {
-        #     'input_ids_batch': input_ids_batch,
-        #     'token_type_ids_batch': token_type_ids_batch,
-        #     'attention_mask_batch': attention_mask_batch,
-        #     'sep_index_batch': sep_index_batch,
-        #
-        #     'word_piece_flags_batch': word_piece_flags_batch,
-        #
-        #     'sent1_org_len_batch': sent1_org_len_batch,
-        #     'sent1_len_batch': sent1_len_batch,
-        #     'adj_matrix1_batch': adj_matrix1_batch,
-        #
-        #     'sent2_org_len_batch': sent2_org_len_batch,
-        #     'sent2_len_batch': sent2_len_batch,
-        #     'adj_matrix2_batch': adj_matrix2_batch,
-        #
-        #     'labels': labels,
-        #
-        #     'sent1_id_batch': sent1_id_batch
-        # }
-        # return result
 
 class DataProcessor(object):
     """Base class for data converters for sequence classification data sets."""
@@ -328,7 +238,7 @@ class DataProcessor(object):
             self.sentence_dict = {}
             count_temp = 0
             for sent_id, sent_obj in self.org_sent2sent_obj_dict.items():
-                sent_obj.id = count_temp
+                sent_obj.guid = count_temp
                 self.sentence_dict[str(count_temp)] = sent_obj
                 count_temp += 1
 
@@ -366,6 +276,10 @@ class DataProcessor(object):
 
         return self.example_dict
 
+    def add_root_to_text_of_example(self):
+        for e in self.example_dict.values():
+            e.add_root_to_text()
+
     def get_examples(self, data_dir=None, set_type='train'):
 
         if set_type not in self.type2examples:
@@ -398,6 +312,18 @@ class DataProcessor(object):
         return sentence_dict
 
     def _parse_sentences(self):
+        def check():
+            if len(parsed_sentence_dict) != len(self.sentence_dict):
+                raise ValueError("parsed_sentence_dict not march sentence_dict")
+                pass
+
+            if not general_tool.compare_two_dict_keys(self.sentence_dict.copy(), parsed_sentence_dict.copy()):
+                raise ValueError("parsed_sentence_dict not march sentence_dict")
+
+            for sent_id_, info in parsed_sentence_dict.items():
+                if info['original'] != self.sentence_dict[sent_id_].original:
+                    raise ValueError("parsed_sentence_dict not march sentence_dict")
+
         parsed_sentence_org_file = file_tool.connect_path(self.data_path, 'parsed_sentences.txt')
         parsed_sentence_dict_file = file_tool.connect_path(self.data_path, 'parsed_sentence_dict.pkl')
         if file_tool.check_file(parsed_sentence_dict_file):
@@ -406,16 +332,8 @@ class DataProcessor(object):
             parsed_sentence_dict = parser_tool.extra_parsed_sentence_dict_from_org_file(parsed_sentence_org_file)
             file_tool.save_data_pickle(parsed_sentence_dict, parsed_sentence_dict_file)
 
-        if len(parsed_sentence_dict) != len(self.sentence_dict):
-            raise ValueError("parsed_sentence_dict not march sentence_dict")
-            pass
-
-        if not general_tool.compare_two_dict_keys(self.sentence_dict.copy(), parsed_sentence_dict.copy()):
-            raise ValueError("parsed_sentence_dict not march sentence_dict")
-
-        for sent_id, info in parsed_sentence_dict.items():
-            if info['original'] != self.sentence_dict[sent_id].original:
-                raise ValueError("parsed_sentence_dict not march sentence_dict")
+        check()
+        logger.info('Parsed sentences information correct !')
 
         for sent_id, parsed_info in parsed_sentence_dict.items():
             sent_id = str(sent_id)

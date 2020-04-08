@@ -32,11 +32,16 @@ class MrpcProcessor(DataProcessor):
     def _create_examples(self, lines, set_type):
         """Creates examples for the training and dev sets."""
         logger.info('Load {} set.'.format(set_type))
+        e_id_interval = 10000
+        e_id_base = {'train': 0, 'test': e_id_interval, 'dev': e_id_interval*2}[set_type]
         examples = []
+        if len(lines)>e_id_interval:
+            raise ValueError
         for (i, line) in enumerate(lines):
             if i == 0:
                 continue
             guid = "%s-%s" % (set_type, i)
+            e_id = e_id_base+i
             org_sent_a = line[3]
             org_sent_b = line[4]
 
@@ -44,7 +49,7 @@ class MrpcProcessor(DataProcessor):
             sent_b = self.org_sent2sent_obj_dict[org_sent_b]
 
             label = line[0]
-            examples.append(InputExample(guid=guid, sent_a=sent_a, sent_b=sent_b, label=label))
+            examples.append(InputExample(guid=guid, id=e_id, sent_a=sent_a, sent_b=sent_b, label=label))
         return examples
 
     def _create_sentence_dict(self, lines, set_type):

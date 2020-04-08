@@ -214,6 +214,7 @@ def create_args():
     args.max_sentence_length = 50
     args.optimizer = 'adam'
     args.gcn_hidden_dim = 768
+    args.framework_with_gcn = ['LSSE', 'LSyE']
 
     return args
 

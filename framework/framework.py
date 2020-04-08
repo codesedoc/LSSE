@@ -1,5 +1,6 @@
 import torch
 from abc import abstractmethod
+import glue.glue as glue
 
 
 class Framework(torch.nn.Module):
@@ -8,6 +9,7 @@ class Framework(torch.nn.Module):
         self.args = args
         self.update_args()
         self.create_models()
+        self.processor = glue.glue_processors[self.args.task_name]()
         # self.init_weights()
 
     # def init_weights(self):
