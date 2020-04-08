@@ -1,4 +1,3 @@
-import corpus
 import framework as fr
 import argparse
 import utils.hyperor as hyperor
@@ -213,8 +212,25 @@ def create_args():
     args.device = device
     args.max_sentence_length = 50
     args.optimizer = 'adam'
-    args.gcn_hidden_dim = 768
     args.framework_with_gcn = ['LSSE', 'LSyE']
+    args.encoder_hidden_dim = 768
+    args.fully_scales = [args.encoder_hidden_dim * 2, 2]
+    if args.framework_name in args.framework_with_gcn:
+        args.gcn_hidden_dim = args.encoder_hidden_dim
+        args.gcn_layer = 2
+        args.gcn_gate_flag = True
+        args.gcn_norm_item = 0.5
+        args.gcn_self_loop_flag = True
+        args.gcn_group_layer_limit_flag = False
+        if args.gcn_group_layer_limit_flag:
+            args.gcn_dep_layer_limit_list = [6, 5, 4, 3, 2]
+        args.gcn_dropout = 1.0
+        args.gcn_position_encoding_flag = True
+
+        args.fully_scales = [args.gcn_hidden_dim * 2, 2]
+
+        if not args.without_concatenate_input_for_gcn_hidden:
+            args.fully_scales[0] += args.gcn_hidden_dim
 
     return args
 
@@ -222,6 +238,7 @@ def create_args():
 def run_framework():
     # raise ValueError('my error!')
     args = create_args()
+
     framework_manager = fr.FrameworkManager(args)
     # framework_manager.train_model()
     framework_manager.run()
@@ -229,38 +246,39 @@ def run_framework():
 
 
 def run_hyperor():
-    arg_dict = create_arg_dict()
-    hyr = hyperor.Hyperor(arg_dict)
+    args = create_args()
+
+    hyr = hyperor.Hyperor(args)
     hyr.tune_hyper_parameter()
 
 
-def corpus_test():
-    # corpus.stsb.test()
-    # corpus.mrpc.test()
-    # mrpc_obj = corpus.mrpc.get_mrpc_obj()
-    # tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
-    # general_tool.covert_transformer_tokens_to_words(mrpc_obj, tokenizer,
-    #                                                 'corpus/mrpc/sentence_words(bert-base-cased).txt',
-    #                                                 '##')
-    # qqp_obj = corpus.qqp.get_qqp_obj()
-    # tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
-    # general_tool.covert_transformer_tokens_to_words(qqp_obj, tokenizer,
-    #                                                 'corpus/qqp/sentence_words(bert-base-cased).txt',
-    #                                                 '##')
-    # general_tool.calculate_the_max_len_of_tokens_split_by_bert(qqp_obj, tokenizer)
-    # corpus.qqp.test()
-
-    stsb_obj = corpus.stsb.get_stsb_obj()
-    tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
-    general_tool.calculate_the_max_len_of_tokens_split_by_bert(stsb_obj, tokenizer)
-    # general_tool.covert_transformer_tokens_to_words(stsb_obj, tokenizer,
-    #                                                 'corpus/stsb/sentence_words(bert-base-cased).txt',
-    #                                                 '##')
+# def corpus_test():
+#     # corpus.stsb.test()
+#     # corpus.mrpc.test()
+#     # mrpc_obj = corpus.mrpc.get_mrpc_obj()
+#     # tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
+#     # general_tool.covert_transformer_tokens_to_words(mrpc_obj, tokenizer,
+#     #                                                 'corpus/mrpc/sentence_words(bert-base-cased).txt',
+#     #                                                 '##')
+#     # qqp_obj = corpus.qqp.get_qqp_obj()
+#     # tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
+#     # general_tool.covert_transformer_tokens_to_words(qqp_obj, tokenizer,
+#     #                                                 'corpus/qqp/sentence_words(bert-base-cased).txt',
+#     #                                                 '##')
+#     # general_tool.calculate_the_max_len_of_tokens_split_by_bert(qqp_obj, tokenizer)
+#     # corpus.qqp.test()
+#
+#     stsb_obj = corpus.stsb.get_stsb_obj()
+#     tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
+#     general_tool.calculate_the_max_len_of_tokens_split_by_bert(stsb_obj, tokenizer)
+#     # general_tool.covert_transformer_tokens_to_words(stsb_obj, tokenizer,
+#     #                                                 'corpus/stsb/sentence_words(bert-base-cased).txt',
+#     #                                                 '##')
 
 def main():
 
-    run_framework()
-    # run_hyperor()
+    # run_framework()
+    run_hyperor()
     # er_analysis.test()
     # mrpc_analysis.test()
     # corpus_test()

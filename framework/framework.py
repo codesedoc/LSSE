@@ -17,10 +17,7 @@ class Framework(torch.nn.Module):
 
     def update_args(self):
         if self.args.semantic_compare_func == 'wmd':
-            self.args.fully_scales = [self.args.max_sentence_length ** 2 + self.args.bert_hidden_dim, 2]
-
-        elif not self.args.without_concatenate_input_for_gcn_hidden:
-            self.args.fully_scales[0] += self.args.gcn_hidden_dim
+            self.args.fully_scales = [self.args.max_sentence_length ** 2 + self.args.encoder_hidden_dim, 2]
 
         if self.args.output_mode == 'regression':
             self.args.fully_scales[-1] = 1

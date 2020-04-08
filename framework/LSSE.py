@@ -22,19 +22,6 @@ class LSSE(fr.Framework):
         self.gcn = None
         self.semantic_layer = None
         self.fully_connection = None
-        args.gcn_layer = 2
-        args.gcn_gate_flag = True
-        args.gcn_norm_item = 0.5
-        args.gcn_self_loop_flag = True
-        args.gcn_group_layer_limit_flag = False
-        if args.gcn_group_layer_limit_flag:
-            args.gcn_dep_layer_limit_list = [6, 5, 4, 3, 2]
-
-        args.gcn_dropout = 1.0
-        args.gcn_position_encoding_flag = True
-
-        args.fully_scales = [args.gcn_hidden_dim * 2, 2]
-
         super().__init__(args)
         self.name = LSSE.name
         self.result_path = LSSE.result_path

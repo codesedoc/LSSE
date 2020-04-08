@@ -15,7 +15,6 @@ class SeE(fr.LSeE):
     result_path = file_tool.connect_path('result', name)
 
     def __init__(self, args):
-        args.fully_scales = [args.gcn_hidden_dim * 2, 2]
         super().__init__(args)
         self.name = SeE.name
         self.result_path = SeE.result_path
