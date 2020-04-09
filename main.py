@@ -67,7 +67,7 @@ def create_args():
         type=str,
         default="l2",
         help="The name of framework, choose in [l2, wmd]",
-        choices=['l2', 'wmd']
+        choices=['l1', 'l2', 'wmd']
     )
 
     parser.add_argument(
@@ -216,6 +216,7 @@ def create_args():
     args.framework_with_gcn = ['LSSE', 'LSyE']
     args.encoder_hidden_dim = 768
     args.fully_scales = [args.encoder_hidden_dim * 2, 2]
+    args.max_encoder_seq_length = args.max_seq_length
     if args.framework_name in args.framework_with_gcn:
         args.gcn_hidden_dim = args.encoder_hidden_dim
         args.gcn_layer = 2

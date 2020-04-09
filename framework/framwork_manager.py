@@ -274,7 +274,8 @@ class FrameworkManager:
 
                         for key, value in logs.items():
                             tb_writer.add_scalar(key, value, global_step)
-                        print(json.dumps({**logs, **{"step": global_step}}))
+                        # print(json.dumps({**logs, **{"step": global_step}}))
+                        self.logger.info(json.dumps({**logs, **{"step": global_step}}))
 
                     if self.args.local_rank in [-1, 0] and self.args.save_steps > 0 and global_step % self.args.save_steps == 0:
                         # Save model checkpoint
@@ -291,7 +292,7 @@ class FrameworkManager:
 
         if self.args.local_rank in [-1, 0]:
             tb_writer.close()
-        file_tool.save_data_pickle(loss_list, 'analysis/baseline/run_on_my_pc/cuda/loss_list.pkl')
+        # file_tool.save_data_pickle(loss_list, 'analysis/baseline/run_on_my_pc/cuda/loss_list.pkl')
         return global_step, tr_loss / global_step
 
     def evaluate(self, prefix=""):
@@ -391,8 +392,8 @@ class FrameworkManager:
             prefix = checkpoint.split("/")[-1] if checkpoint.find("checkpoint") != -1 else ""
             # self.load(checkpoint)
             result = self.evaluate(prefix=prefix)
-
-        return result
+        optuna_result = 1-result['acc']
+        return optuna_result, result
 
     def load(self, checkpoint):
         self.framework.load_state_dict(torch.load(file_tool.connect_path(checkpoint, 'framework.pt')))

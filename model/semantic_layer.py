@@ -27,12 +27,25 @@ class SemanticLayer(torch.nn.Module):
         elif self.args.semantic_compare_func == 'wmd':
             result = self.word_mover_distance(sentence1s, sentence2s, sentence1_lens, sentence2_lens)
 
+        elif self.args.semantic_compare_func == 'l1':
+            result = self.l1distance(sentence1s, sentence2s)
+
         else:
             raise ValueError
 
         if torch.isnan(result).sum() > 0:
             print(torch.isnan(result))
             raise ValueError
+        return result
+
+    def l1distance(self, sentence1s, sentence2s):
+        sentence1_len = sentence1s.size()[1]
+        sentence2_len = sentence2s.size()[1]
+        sentence1s = sentence1s.sum(dim=1) / sentence1_len
+        sentence2s = sentence2s.sum(dim=1) / sentence2_len
+
+        result = torch.abs(sentence1s - sentence2s)
+
         return result
 
     def l2distance(self, sentence1s, sentence2s):

@@ -54,10 +54,8 @@ class Hyperor:
             self.log_trial(self.study.best_trial, 'best trial info')
 
         framework_manager = fr.FrameworkManager(args=self.args, trial=trial)
-        result, last_epoch, return_state = framework_manager.run()
-        trial.set_user_attr('avg_accuracy', 1 - result)
-        trial.set_user_attr('avg_epoch', last_epoch)
-        trial.set_user_attr('return_state', return_state)
+        result, attr = framework_manager.run()
+        trial.set_user_attr('attributes', result)
         torch.cuda.empty_cache()
         self.log_trial(trial, 'current trial info')
 
