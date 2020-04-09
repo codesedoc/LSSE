@@ -8,7 +8,7 @@ import logging
 import analysis.error_analysis as er_analysis
 import analysis.mrpc_analysis as mrpc_analysis
 from model import MODEL_CLASSES, ALL_MODELS
-from glue.glue import glue_processors as processors
+from glue.glue_manager import glue_processors as processors
 import os
 
 def create_args():

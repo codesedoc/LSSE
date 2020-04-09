@@ -9,46 +9,53 @@ from transformers import glue_compute_metrics as compute_metrics
 
 logger = logging.getLogger(__name__)
 
+glue_tasks_num_labels = {
+    "cola": 2,
+    "mnli": 3,
+    "mrpc": 2,
+    "sst-2": 2,
+    "sts-b": 1,
+    "qqp": 2,
+    "qnli": 2,
+    "rte": 2,
+    "wnli": 2,
+}
+
+glue_processors = {
+    # "cola": ColaProcessor,
+    # "mnli": MnliProcessor,
+    # "mnli-mm": MnliMismatchedProcessor,
+    "mrpc": MrpcProcessor,
+    # "sst-2": Sst2Processor,
+    # "sts-b": StsbProcessor,
+    # "qqp": QqpProcessor,
+    # "qnli": QnliProcessor,
+    # "rte": RteProcessor,
+    # "wnli": WnliProcessor,
+}
+
+glue_output_modes = {
+    "cola": "classification",
+    "mnli": "classification",
+    "mnli-mm": "classification",
+    "mrpc": "classification",
+    "sst-2": "classification",
+    "sts-b": "regression",
+    "qqp": "classification",
+    "qnli": "classification",
+    "rte": "classification",
+    "wnli": "classification",
+}
+
+
 @singleton
 class GLUE:
     def __init__(self):
-        self.tasks_num_labels = {
-            "cola": 2,
-            "mnli": 3,
-            "mrpc": 2,
-            "sst-2": 2,
-            "sts-b": 1,
-            "qqp": 2,
-            "qnli": 2,
-            "rte": 2,
-            "wnli": 2,
-        }
+        self.tasks_num_labels = glue_tasks_num_labels
 
-        self.processors = {
-            # "cola": ColaProcessor,
-            # "mnli": MnliProcessor,
-            # "mnli-mm": MnliMismatchedProcessor,
-            "mrpc": MrpcProcessor,
-            # "sst-2": Sst2Processor,
-            # "sts-b": StsbProcessor,
-            # "qqp": QqpProcessor,
-            # "qnli": QnliProcessor,
-            # "rte": RteProcessor,
-            # "wnli": WnliProcessor,
-        }
+        self.processors = glue_processors
 
-        self.output_modes = {
-            "cola": "classification",
-            "mnli": "classification",
-            "mnli-mm": "classification",
-            "mrpc": "classification",
-            "sst-2": "classification",
-            "sts-b": "regression",
-            "qqp": "classification",
-            "qnli": "classification",
-            "rte": "classification",
-            "wnli": "classification",
-        }
+        self.output_modes = glue_output_modes
 
 
 @singleton
@@ -57,6 +64,7 @@ class GLUEManager:
         self.glue = GLUE()
         self.args = args
         self.processor = self.glue.processors[self.args.task_name]()
+        self.compute_metrics = compute_metrics
 
     def convert_examples_to_features(self, examples, tokenizer):
         framework_name = self.args.framework_name
