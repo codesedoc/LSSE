@@ -407,22 +407,36 @@
 # a['ada'] = 4
 # print(a.items())
 
-a = set(['abc', 'bgsdg', 'cerwe'])
-print(a)
+# a = set(['abc', 'bgsdg', 'cerwe'])
+# print(a)
+#
+# a.add('bad')
+# print(a)
+#
+# a = sorted(a, key= lambda x: x)
+# print(a)
+#
+# a = set(a)
+#
+# print(a)
+#
+# a.add('bda')
+#
+# print(a)
+# a.add('ada')
 
-a.add('bad')
-print(a)
 
-a = sorted(a, key= lambda x: x)
-print(a)
+# print(a)
+import utils.hyperor as hyperor
+class A:
+    def f(self):
+        pass
 
-a = set(a)
+print(A.__dict__)
+print(dir(A))
 
-print(a)
+print(hyperor.__dict__.keys())
+print(dir(hyperor))
 
-a.add('bda')
-
-print(a)
-a.add('ada')
-
-print(a)
+print(len(hyperor.__dict__))
+print(len(dir(hyperor)))

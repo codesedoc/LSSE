@@ -209,6 +209,7 @@ def create_args():
         level=logging.INFO if args.local_rank in [-1, 0] else logging.WARN,
     )
 
+    args.task_name = args.task_name.lower()
     args.device = device
     args.max_sentence_length = 50
     args.optimizer = 'adam'
@@ -277,8 +278,8 @@ def run_hyperor():
 
 def main():
 
-    # run_framework()
-    run_hyperor()
+    run_framework()
+    # run_hyperor()
     # er_analysis.test()
     # mrpc_analysis.test()
     # corpus_test()

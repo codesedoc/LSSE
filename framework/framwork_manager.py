@@ -1,33 +1,32 @@
 import torch
-import utils.data_tool as data_tool
 import utils.file_tool as file_tool
-import optuna
 import utils.log_tool as log_tool
-import utils.visualization_tool as visualization_tool
 import framework as fr
 import numpy as np
-import utils.SimpleProgressBar as progress_bar
-from sklearn.metrics import matthews_corrcoef, f1_score
-import scipy
-from scipy.stats import pearsonr, spearmanr
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
 from torch.utils.data.distributed import DistributedSampler
 from glue.utils import AdamW, get_linear_schedule_with_warmup
-import glue.glue as glue
+import glue.glue_manager as glue_manager
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 import json
 from utils import general_tool
-import glob
 from model import MODEL_CLASSES
+
+# import optuna
+# import glob
+# import utils.visualization_tool as visualization_tool
+# import utils.data_tool as data_tool
+
 
 class FrameworkManager:
     def __init__(self, args, trial=None):
         super().__init__()
 
         self.args = args
-
+        self.glue_manager = glue_manager.GLUEManager(self.args)
         self.framework = None
+        self.tokenizer = None
         self.framework_logger_name = 'framework_logger'
         self.logger = None
         if trial is not None:
@@ -37,10 +36,10 @@ class FrameworkManager:
 
         # Prepare GLUE task
         self.args.task_name = self.args.task_name.lower()
-        if self.args.task_name not in glue.glue_processors:
+        if self.args.task_name not in self.glue_manager.glue.processors:
             raise ValueError("Task not found: %s" % (self.args.task_name))
-        processor = glue.glue_processors[self.args.task_name]()
-        self.args.output_mode = glue.glue_output_modes[self.args.task_name]
+        processor = self.glue_manager.glue.processors[self.args.task_name]()
+        self.args.output_mode = self.glue_manager.glue.output_modes[self.args.task_name]
         label_list = processor.get_labels()
         self.args.num_labels = len(label_list)
         self.args.dep_kind_count = processor.parse_info.dependency_count
@@ -300,23 +299,11 @@ class FrameworkManager:
         model = self.framework
         eval_task_names = ("mnli", "mnli-mm") if self.args.task_name == "mnli" else (self.args.task_name,)
         eval_outputs_dirs = (self.args.output_dir, self.args.output_dir + "-MM") if self.args.task_name == "mnli" else (
-        self.args.output_dir,)
+                             self.args.output_dir,)
 
         results = {}
         for eval_task, eval_output_dir in zip(eval_task_names, eval_outputs_dirs):
-            eval_dataset = glue.load_and_cache_examples(
-                args=self.args,
-                task = eval_task,
-                tokenizer = self.tokenizer,
-                model_type = self.args.model_type,
-                framework_name=self.args.framework_name,
-                model_name_or_path = self.args.model_name_or_path,
-                evaluate=True,
-                max_seq_length=self.args.max_seq_length,
-                max_sent_length=self.args.max_sentence_length,
-                overwrite_cache=self.args.overwrite_cache,
-                data_dir=self.args.data_dir
-            )
+            eval_dataset = self.glue_manager.get_dataset(tokenizer=self.tokenizer, evaluate=True, test=False)
 
             if not file_tool.check_dir(eval_output_dir) and self.args.local_rank in [-1, 0]:
                 file_tool.makedir(eval_output_dir)
@@ -364,7 +351,7 @@ class FrameworkManager:
                 preds = np.argmax(preds, axis=1)
             elif self.args.output_mode == "regression":
                 preds = np.squeeze(preds)
-            result = glue.compute_metrics(eval_task, preds, out_label_ids)
+            result = self.glue_manager.compute_metrics(eval_task, preds, out_label_ids)
             results.update(result)
 
             output_eval_file = file_tool.connect_path(eval_output_dir, prefix, "eval_results.txt")
@@ -380,19 +367,7 @@ class FrameworkManager:
         self._print_args()
         # Training
         if self.args.do_train:
-            train_dataset = glue.load_and_cache_examples(
-                args=self.args,
-                task=self.args.task_name,
-                tokenizer=self.tokenizer,
-                model_type=self.args.model_type,
-                framework_name=self.args.framework_name,
-                model_name_or_path=self.args.model_name_or_path,
-                evaluate=False,
-                max_seq_length=self.args.max_seq_length,
-                max_sent_length=self.args.max_sentence_length,
-                overwrite_cache=self.args.overwrite_cache,
-                data_dir=self.args.data_dir
-            )
+            train_dataset = self.glue_manager.get_dataset( tokenizer=self.tokenizer, evaluate=False, test=False)
             global_step, tr_loss = self.train(train_dataset)
             self.logger.info(" global_step = %s, average loss = %s", global_step, tr_loss)
 

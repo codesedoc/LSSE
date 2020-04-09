@@ -1,7 +1,5 @@
 from glue.utils import DataProcessor, InputExample, InputSentence
 import logging
-import os
-import utils.file_tool as file_tool
 from utils.general_tool import singleton
 
 
