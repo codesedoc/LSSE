@@ -146,7 +146,8 @@ def extra_parsed_sentence_dict_from_org_file(org_file):
 #
 #     return parsed_sentence_dict
 
-
+def group_dependencies(parsing_sentence_dict):
+    pass
 
 def modify_dependency_name(parsing_sentence_dict):
     for sent_id, parsing_info in parsing_sentence_dict.items():
