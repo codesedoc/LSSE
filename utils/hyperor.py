@@ -55,7 +55,7 @@ class Hyperor:
 
         framework_manager = fr.FrameworkManager(args=self.args, trial=trial)
         result, attr = framework_manager.run()
-        trial.set_user_attr('attributes', result)
+        trial.set_user_attr('attributes', attr)
         torch.cuda.empty_cache()
         self.log_trial(trial, 'current trial info')
 

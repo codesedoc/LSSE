@@ -339,7 +339,8 @@ class DataProcessor(object):
             sent_id = str(sent_id)
             self.sentence_dict[sent_id].parsed_info = parsed_info
 
-        self.parse_info = parser_tool.process_parsing_sentence_dict(parsed_sentence_dict, modify_dep_name=True)
+        self.parse_info = parser_tool.process_parsing_sentence_dict(parsed_sentence_dict, modify_dep_name=True,
+                                                                    delete_root_dep=True)
         numeral_sentence_dict = self.parse_info.numeral_sentence_dict
 
         if not general_tool.compare_two_dict_keys(self.sentence_dict.copy(), numeral_sentence_dict.copy()):
