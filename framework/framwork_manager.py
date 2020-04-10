@@ -295,7 +295,14 @@ class FrameworkManager:
         # file_tool.save_data_pickle(loss_list, 'analysis/baseline/run_on_my_pc/cuda/loss_list.pkl')
         return global_step, tr_loss / global_step
 
-    def evaluate(self, prefix=""):
+    def evaluate(self,  dev_flag, test_flag, prefix=""):
+        if (dev_flag and test_flag) or not (dev_flag or test_flag):
+            raise ValueError
+
+        if dev_flag:
+            prefix += "dev"
+        else:
+            prefix += "train"
         # Loop to handle MNLI double evaluation (matched, mis-matched)
         model = self.framework
         eval_task_names = ("mnli", "mnli-mm") if self.args.task_name == "mnli" else (self.args.task_name,)
@@ -304,7 +311,7 @@ class FrameworkManager:
 
         results = {}
         for eval_task, eval_output_dir in zip(eval_task_names, eval_outputs_dirs):
-            eval_dataset = self.glue_manager.get_dataset(tokenizer=self.tokenizer, evaluate=True, test=False)
+            eval_dataset = self.glue_manager.get_dataset(task=eval_task, tokenizer=self.tokenizer, dev=dev_flag, test=test_flag)
 
             if not file_tool.check_dir(eval_output_dir) and self.args.local_rank in [-1, 0]:
                 file_tool.makedir(eval_output_dir)
@@ -355,7 +362,7 @@ class FrameworkManager:
             result = self.glue_manager.compute_metrics(eval_task, preds, out_label_ids)
             results.update(result)
 
-            output_eval_file = file_tool.connect_path(eval_output_dir, prefix, "eval_results.txt")
+            output_eval_file = file_tool.connect_path(eval_output_dir, "eval_{}_results.txt".format(prefix))
             with open(output_eval_file, "w") as writer:
                 self.logger.info("***** Eval results {} *****".format(prefix))
                 for key in sorted(result.keys()):
@@ -368,7 +375,7 @@ class FrameworkManager:
         self._print_args()
         # Training
         if self.args.do_train:
-            train_dataset = self.glue_manager.get_dataset( tokenizer=self.tokenizer, evaluate=False, test=False)
+            train_dataset = self.glue_manager.get_dataset(task=self.args.task_name, tokenizer=self.tokenizer, dev=False, test=False)
             global_step, tr_loss = self.train(train_dataset)
             self.logger.info(" global_step = %s, average loss = %s", global_step, tr_loss)
 
@@ -390,16 +397,25 @@ class FrameworkManager:
             checkpoint = file_tool.connect_path(self.args.output_dir, 'checkpoint')
             self.logger.info("Evaluate the checkpoint: %s", checkpoint)
             prefix = checkpoint.split("/")[-1] if checkpoint.find("checkpoint") != -1 else ""
-            # self.load(checkpoint)
-            result = self.evaluate(prefix=prefix)
+            if not self.args.do_train:
+                self.load(checkpoint)
+            result = self.evaluate(dev_flag=True, test_flag=False, prefix=prefix)
+
+        if self.args.do_test and self.args.local_rank in [-1, 0]:
+            checkpoint = file_tool.connect_path(self.args.output_dir, 'checkpoint')
+            self.logger.info("Evaluate the checkpoint: %s", checkpoint)
+            prefix = checkpoint.split("/")[-1] if checkpoint.find("checkpoint") != -1 else ""
+            if not self.args.do_train:
+                self.load(checkpoint)
+            result = self.evaluate(dev_flag=False, test_flag=True, prefix=prefix)
+
+        result['output_dir'] = self.args.output_dir
         optuna_result = 1-result['acc']
         return optuna_result, result
 
     def load(self, checkpoint):
         self.framework.load_state_dict(torch.load(file_tool.connect_path(checkpoint, 'framework.pt')))
         self.tokenizer = self.tokenizer_class.from_pretrained(checkpoint)
-        self.optimizer.load_state_dict(torch.load(file_tool.connect_path(checkpoint, 'optimizer.pt')))
-        self.scheduler.load_state_dict(torch.load(file_tool.connect_path(checkpoint, 'scheduler.pt')))
         self.framework.to(self.args.device)
 
     def save(self, checkpoint):

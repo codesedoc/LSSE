@@ -206,23 +206,23 @@ class GLUEManager:
             examples = (
                 processor.get_examples(data_dir=data_dir, set_type=data_set_type)
             )
-            if args.framework_name in args.framework_with_gcn:
-                processor.add_root_to_text_of_example()
+
+            # if args.framework_name in args.framework_with_gcn:
+            #     processor.add_root_to_text_of_example()
 
             features = self.convert_examples_to_features(examples, tokenizer)
-            if local_rank in [-1, 0]:
-                logger.info("Saving features into cached file %s", cached_features_file)
-                torch.save(features, cached_features_file)
+            # if local_rank in [-1, 0]:
+            #     logger.info("Saving features into cached file %s", cached_features_file)
+            #     torch.save(features, cached_features_file)
 
         if local_rank == 0 and not evaluate:
             torch.distributed.barrier()  # Make sure only the first process in distributed training process the dataset, and the others will use the cache
         return features
 
-    def get_dataset(self, tokenizer, evaluate=False, test=False,):
+    def get_dataset(self, task, tokenizer, dev=False, test=False,):
         framework_name = self.args.framework_name
-        task = self.args.task_name
         output_mode = self.glue.output_modes[task]
-        features = self._load_and_cache_features(tokenizer, evaluate, test)
+        features = self._load_and_cache_features(tokenizer, dev, test)
 
         # Convert to Tensors and build dataset
         all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)

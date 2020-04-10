@@ -149,6 +149,31 @@ def extra_parsed_sentence_dict_from_org_file(org_file):
 def group_dependencies(parsing_sentence_dict):
     pass
 
+def delete_root_dependency(parsing_sentence_dict):
+    for sent_id, parsing_info in parsing_sentence_dict.items():
+        root_index = -1
+        for index, dependency in enumerate(parsing_info['dependencies']):
+            name = dependency['name']
+            if name == 'root':
+                root_index = index
+            else:
+                first_index = dependency['word_pair']['first']['index']
+                second_index = dependency['word_pair']['second']['index']
+                if (not number_tool.is_number(first_index)) or (not number_tool.is_number(second_index)):
+                    continue
+
+                fw_i = int(first_index)
+                dependency['word_pair']['first']['index'] = str(fw_i-1)
+
+                sw_i = int(second_index)
+                dependency['word_pair']['second']['index'] = str(sw_i-1)
+        del parsing_info['dependencies'][root_index]
+        if parsing_info['words'][0] != 'ROOT':
+            raise ValueError
+        del parsing_info['words'][0]
+        parsing_info['has_root'] = False
+    return parsing_sentence_dict
+
 def modify_dependency_name(parsing_sentence_dict):
     for sent_id, parsing_info in parsing_sentence_dict.items():
         for dependency in parsing_info['dependencies']:
@@ -159,9 +184,13 @@ def modify_dependency_name(parsing_sentence_dict):
     return parsing_sentence_dict
 
 
-def process_parsing_sentence_dict(parsing_sentence_dict, modify_dep_name=False):
+def process_parsing_sentence_dict(parsing_sentence_dict, modify_dep_name=False, delete_root_dep=False):
     if modify_dep_name:
         parsing_sentence_dict = modify_dependency_name(parsing_sentence_dict)
+
+    if delete_root_dep:
+        parsing_sentence_dict = delete_root_dependency(parsing_sentence_dict)
+
     word_dict = {}
     dependency_dict = {}
 
