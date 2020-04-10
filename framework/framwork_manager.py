@@ -69,7 +69,7 @@ class FrameworkManager:
         self.framework = self.get_framework()
 
         self.framework.to(self.args.device)
-        self.framework.name = "SeE"
+        self.framework.name = self.args.framework_name
         file_tool.makedir(self.args.output_dir)
         self.logger = log_tool.get_logger(self.framework_logger_name,
                                           file_tool.connect_path(self.args.output_dir, 'log.txt'))

@@ -78,6 +78,14 @@ def create_args():
     )
 
     parser.add_argument(
+        "-gl",
+        "--gcn_layer",
+        type=int,
+        default=2,
+        help="The name of gcn layer",
+    )
+
+    parser.add_argument(
         "--config_name", default="", type=str, help="Pretrained config name or path if not the same as model_name",
     )
     parser.add_argument(
@@ -219,7 +227,6 @@ def create_args():
     args.max_encoder_seq_length = args.max_seq_length
     if args.framework_name in args.framework_with_gcn:
         args.gcn_hidden_dim = args.encoder_hidden_dim
-        args.gcn_layer = 2
         args.gcn_gate_flag = True
         args.gcn_norm_item = 0.5
         args.gcn_self_loop_flag = True
@@ -233,7 +240,8 @@ def create_args():
 
         if not args.without_concatenate_input_for_gcn_hidden:
             args.fully_scales[0] += args.gcn_hidden_dim
-
+    else:
+        del args.gcn_layer
     return args
 
 
