@@ -1,4 +1,3 @@
-import corpus
 import framework as fr
 import argparse
 import utils.hyperor as hyperor
@@ -9,7 +8,7 @@ import logging
 import analysis.error_analysis as er_analysis
 import analysis.mrpc_analysis as mrpc_analysis
 from model import MODEL_CLASSES, ALL_MODELS
-from glue.glue import glue_processors as processors
+from glue.glue_manager import glue_processors as processors
 import os
 
 def create_args():
@@ -53,6 +52,39 @@ def create_args():
     )
 
     # Other parameters
+    parser.add_argument(
+        "-f",
+        "--framework_name",
+        type=str,
+        default="SeE",
+        help="The name of framework, choose in [SeE, LE, LSeE, LSyE, LSSE]",
+        choices=['SeE', 'LE', 'LSeE', 'LSyE', 'LSSE']
+    )
+
+    parser.add_argument(
+        "-scf",
+        "--semantic_compare_func",
+        type=str,
+        default="l2",
+        help="The name of framework, choose in [l2, wmd]",
+        choices=['l1', 'l2', 'wmd']
+    )
+
+    parser.add_argument(
+        "-woc",
+        "--without_concatenate_input_for_gcn_hidden",
+        action="store_true",
+        help="Whether without_concatenate_input_for_gcn_hidden?",
+    )
+
+    parser.add_argument(
+        "-gl",
+        "--gcn_layer",
+        type=int,
+        default=2,
+        help="The name of gcn layer",
+    )
+
     parser.add_argument(
         "--config_name", default="", type=str, help="Pretrained config name or path if not the same as model_name",
     )
@@ -139,6 +171,9 @@ def create_args():
         help="For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']."
              "See details at https://nvidia.github.io/apex/amp.html",
     )
+
+
+
     parser.add_argument("--local_rank", type=int, default=-1, help="For distributed training: local_rank")
     parser.add_argument("--server_ip", type=str, default="", help="For distant debugging.")
     parser.add_argument("--server_port", type=str, default="", help="For distant debugging.")
@@ -182,15 +217,38 @@ def create_args():
         level=logging.INFO if args.local_rank in [-1, 0] else logging.WARN,
     )
 
+    args.task_name = args.task_name.lower()
     args.device = device
     args.max_sentence_length = 50
     args.optimizer = 'adam'
+    args.framework_with_gcn = ['LSSE', 'LSyE']
+    args.encoder_hidden_dim = 768
+    args.fully_scales = [args.encoder_hidden_dim * 2, 2]
+    args.max_encoder_seq_length = args.max_seq_length
+    if args.framework_name in args.framework_with_gcn:
+        args.gcn_hidden_dim = args.encoder_hidden_dim
+        args.gcn_gate_flag = True
+        args.gcn_norm_item = 0.5
+        args.gcn_self_loop_flag = True
+        args.gcn_group_layer_limit_flag = False
+        if args.gcn_group_layer_limit_flag:
+            args.gcn_dep_layer_limit_list = [6, 5, 4, 3, 2]
+        args.gcn_dropout = 1.0
+        args.gcn_position_encoding_flag = True
+
+        args.fully_scales = [args.gcn_hidden_dim * 2, 2]
+
+        if not args.without_concatenate_input_for_gcn_hidden:
+            args.fully_scales[0] += args.gcn_hidden_dim
+    else:
+        del args.gcn_layer
     return args
 
 
 def run_framework():
     # raise ValueError('my error!')
     args = create_args()
+
     framework_manager = fr.FrameworkManager(args)
     # framework_manager.train_model()
     framework_manager.run()
@@ -198,33 +256,34 @@ def run_framework():
 
 
 def run_hyperor():
-    arg_dict = create_arg_dict()
-    hyr = hyperor.Hyperor(arg_dict)
+    args = create_args()
+
+    hyr = hyperor.Hyperor(args)
     hyr.tune_hyper_parameter()
 
 
-def corpus_test():
-    # corpus.stsb.test()
-    # corpus.mrpc.test()
-    # mrpc_obj = corpus.mrpc.get_mrpc_obj()
-    # tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
-    # general_tool.covert_transformer_tokens_to_words(mrpc_obj, tokenizer,
-    #                                                 'corpus/mrpc/sentence_words(bert-base-cased).txt',
-    #                                                 '##')
-    # qqp_obj = corpus.qqp.get_qqp_obj()
-    # tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
-    # general_tool.covert_transformer_tokens_to_words(qqp_obj, tokenizer,
-    #                                                 'corpus/qqp/sentence_words(bert-base-cased).txt',
-    #                                                 '##')
-    # general_tool.calculate_the_max_len_of_tokens_split_by_bert(qqp_obj, tokenizer)
-    # corpus.qqp.test()
-
-    stsb_obj = corpus.stsb.get_stsb_obj()
-    tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
-    general_tool.calculate_the_max_len_of_tokens_split_by_bert(stsb_obj, tokenizer)
-    # general_tool.covert_transformer_tokens_to_words(stsb_obj, tokenizer,
-    #                                                 'corpus/stsb/sentence_words(bert-base-cased).txt',
-    #                                                 '##')
+# def corpus_test():
+#     # corpus.stsb.test()
+#     # corpus.mrpc.test()
+#     # mrpc_obj = corpus.mrpc.get_mrpc_obj()
+#     # tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
+#     # general_tool.covert_transformer_tokens_to_words(mrpc_obj, tokenizer,
+#     #                                                 'corpus/mrpc/sentence_words(bert-base-cased).txt',
+#     #                                                 '##')
+#     # qqp_obj = corpus.qqp.get_qqp_obj()
+#     # tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
+#     # general_tool.covert_transformer_tokens_to_words(qqp_obj, tokenizer,
+#     #                                                 'corpus/qqp/sentence_words(bert-base-cased).txt',
+#     #                                                 '##')
+#     # general_tool.calculate_the_max_len_of_tokens_split_by_bert(qqp_obj, tokenizer)
+#     # corpus.qqp.test()
+#
+#     stsb_obj = corpus.stsb.get_stsb_obj()
+#     tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-cased')
+#     general_tool.calculate_the_max_len_of_tokens_split_by_bert(stsb_obj, tokenizer)
+#     # general_tool.covert_transformer_tokens_to_words(stsb_obj, tokenizer,
+#     #                                                 'corpus/stsb/sentence_words(bert-base-cased).txt',
+#     #                                                 '##')
 
 def main():
 

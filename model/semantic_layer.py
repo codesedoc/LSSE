@@ -5,8 +5,8 @@ import numpy as np
 
 
 class SemanticLayer(torch.nn.Module):
-    def __init__(self, arg_dict):
-        self.arg_dict = arg_dict
+    def __init__(self, args):
+        self.args = args
         super().__init__()
 
     def revise_zero_data(self, tensor):
@@ -18,14 +18,17 @@ class SemanticLayer(torch.nn.Module):
     def forward(self, sentence1s, sentence2s, sentence1_lens=None, sentence2_lens=None):
         sentence1s = sentence1s.float()
         sentence2s = sentence2s.float()
-        if self.arg_dict['semantic_compare_func'] == 'l2':
+        if self.args.semantic_compare_func == 'l2':
             result = self.l2distance(sentence1s, sentence2s)
 
-        elif self.arg_dict['semantic_compare_func'] == 'arccos':
+        elif self.args.semantic_compare_func == 'arccos':
             result = self.calculate_arc_cos(sentence1s, sentence2s)
 
-        elif self.arg_dict['semantic_compare_func'] == 'wmd':
+        elif self.args.semantic_compare_func == 'wmd':
             result = self.word_mover_distance(sentence1s, sentence2s, sentence1_lens, sentence2_lens)
+
+        elif self.args.semantic_compare_func == 'l1':
+            result = self.l1distance(sentence1s, sentence2s)
 
         else:
             raise ValueError
@@ -33,6 +36,16 @@ class SemanticLayer(torch.nn.Module):
         if torch.isnan(result).sum() > 0:
             print(torch.isnan(result))
             raise ValueError
+        return result
+
+    def l1distance(self, sentence1s, sentence2s):
+        sentence1_len = sentence1s.size()[1]
+        sentence2_len = sentence2s.size()[1]
+        sentence1s = sentence1s.sum(dim=1) / sentence1_len
+        sentence2s = sentence2s.sum(dim=1) / sentence2_len
+
+        result = torch.abs(sentence1s - sentence2s)
+
         return result
 
     def l2distance(self, sentence1s, sentence2s):

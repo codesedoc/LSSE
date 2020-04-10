@@ -25,17 +25,20 @@ class LSeE(fr.Framework):
 
     def update_args(self):
         super().update_args()
+        if self.args.do_train:
+            time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
+            output_dir = file_tool.connect_path(self.result_path,
+                                                'train',
+                                                'bs:{}-lr:{}-com_fun:{}'.
+                                                format(self.args.per_gpu_train_batch_size,
+                                                       self.args.learning_rate,
+                                                       self.args.semantic_compare_func),
+                                                time_str)
 
-        time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
-        output_dir = file_tool.connect_path(self.result_path, 'train',
-                                               'bs:{}-lr:{}-com_fun:{}'.
-                                               format(self.arg_dict['batch_size'], self.arg_dict['learn_rate'],
-                                                      self.arg_dict['semantic_compare_func']), time_str)
-
-        file_tool.makedir(output_dir)
-        if not file_tool.check_dir(output_dir):
-            raise RuntimeError
-        self.args.output_dir = output_dir
+            file_tool.makedir(output_dir)
+            if not file_tool.check_dir(output_dir):
+                raise RuntimeError
+            self.args.output_dir = output_dir
 
     def create_models(self):
         self.bert = BertBase()

@@ -19,6 +19,7 @@ class SeE(fr.LSeE):
         self.name = SeE.name
         self.result_path = SeE.result_path
 
+
     @classmethod
     def framework_name(cls):
         return cls.name
@@ -26,195 +27,71 @@ class SeE(fr.LSeE):
     def create_models(self):
         self.with_linear_head = False
         if self.with_linear_head:
-            self.bert = BertForSeqClassify()
+            self.encoder = BertForSeqClassify(self.args)
         else:
-            self.bert = BertBase()
-            config = self.bert.config
+            self.encoder = BertBase(self.args)
+            config = self.encoder.config
             self.dropout = torch.nn.Dropout(config.hidden_dropout_prob)
-            if self.arg_dict['task_type'] == 'classification':
-                self.classifier = torch.nn.Linear(config.hidden_size, 2)
-            elif self.arg_dict['task_type'] == 'regression':
-                self.classifier = torch.nn.Linear(config.hidden_size, 1)
-            else:
-                raise ValueError
 
-            self.classifier.weight.data.normal_(mean=0.0, std=config.initializer_range)
-            self.classifier.bias.data.zero_()
-        self.bert_name = self.bert.name
+            self.classifier = torch.nn.Linear(config.hidden_size, config.num_labels)
+            self.classifier.load_state_dict(torch.load('model/classifier.pts'))
+            pass
+            # self.classifier.weight.data.normal_(mean=0.0, std=config.initializer_range)
+            # self.classifier.bias.data.zero_()
 
     def update_args(self):
-        time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
-        output_dir = file_tool.connect_path(self.result_path,
-                                            'train',
-                                            'bs:{}-lr:{}'.format(self.arg_dict['batch_size'],
-                                                                 self.arg_dict['learn_rate']),
-                                            time_str)
+        super().update_args()
+        if self.args.do_train:
+            time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
+            output_dir = file_tool.connect_path(self.result_path,
+                                                'train',
+                                                'bs:{}-lr:{}'.format(self.args.per_gpu_train_batch_size,
+                                                                     self.args.learning_rate),
+                                                time_str)
 
-        file_tool.makedir(output_dir)
-        if not file_tool.check_dir(output_dir):
-            raise RuntimeError
-        self.args.output_dir = output_dir
+            file_tool.makedir(output_dir)
+            if not file_tool.check_dir(output_dir):
+                raise RuntimeError
+            self.args.output_dir = output_dir
 
     def count_of_parameter(self):
-        with torch.no_grad():
-            self.cpu()
-            if not self.with_linear_head:
-                model_list = [self, self.bert, self.classifier]
-            else:
-                model_list = [self, self.bert]
+        if not self.with_linear_head:
+            model_list = [self, self.encoder, self.classifier]
+            name_list = ['Entire', self.encoder.name, 'classifier']
+        else:
+            model_list = [self, self.encoder]
+            name_list = [self, self.encoder.name]
 
-            parameter_counts = []
-            weight_counts = []
-            bias_counts = []
-            parameter_list = []
-            weights_list = []
-            bias_list = []
-            for model_ in model_list:
-                parameters_temp = model_.named_parameters()
-                weights_list.clear()
-                parameter_list.clear()
-                bias_list.clear()
-                for name, p in parameters_temp:
-                    # print(name)
-                    parameter_list.append(p.reshape(-1))
-                    if name.find('weight') != -1:
-                        weights_list.append(p.reshape(-1))
-                    if name.find('bias') != -1:
-                        bias_list.append(p.reshape(-1))
-                parameters = torch.cat(parameter_list, dim=0)
-                weights = torch.cat(weights_list, dim=0)
-                biases = torch.cat(bias_list, dim=0)
-                parameter_counts.append(len(parameters))
-                weight_counts.append(len(weights))
-                bias_counts.append(len(biases))
-            for p_count, w_count, b_count in zip(parameter_counts, weight_counts, bias_counts):
-                if p_count != w_count + b_count:
-                    raise ValueError
-
-            for kind in (parameter_counts, weight_counts, bias_counts):
-                total = kind[0]
-                others = kind[1:]
-                count_temp = 0
-                for other in others:
-                    count_temp += other
-                if total != count_temp:
-                    raise ValueError
-            self.to(self.device)
-
-            result = [
-                {'name': 'entire', 'total': parameter_counts[0], 'weight': weight_counts[0], 'bias': bias_counts[0]},
-                {'name': self.bert_name, 'total': parameter_counts[1], 'weight': weight_counts[1], 'bias': bias_counts[1]},
-            ]
-            if not self.with_linear_head:
-                result.append({'name': 'classifier', 'total': parameter_counts[2], 'weight': weight_counts[2],'bias': bias_counts[2]})
-
-            return result
-
-    def deal_with_example_batch(self, example_ids, example_dict):
-        examples = [example_dict[str(e_id.item())] for e_id in example_ids]
-        sentence_max_len = self.arg_dict['sentence_max_len_for_bert']
-        pad_on_right = self.arg_dict['pad_on_right']
-        pad_token = self.bert.tokenizer.convert_tokens_to_ids([self.bert.tokenizer.pad_token])[0]
-        mask_padding_with_zero = True
-        pad_token_segment_id = 0
-
-        sentence1s = [e.sentence1 for e in examples]
-        sentence2s = [e.sentence2 for e in examples]
-
-        if self.arg_dict['task_type'] == 'classification':
-            labels = torch.tensor([e.label for e in examples], dtype=torch.long, device=self.device)
-        elif self.arg_dict['task_type'] == 'regression':
-            labels = torch.tensor([e.label for e in examples], dtype=self.data_type, device=self.device)
-
-        input_ids_batch = []
-        token_type_ids_batch = []
-        attention_mask_batch = []
-
-        for s1, s2 in zip(sentence1s, sentence2s):
-            inputs_ls_cased = self.bert.tokenizer.encode_plus(s1.word_tokens(), s2.word_tokens(),
-                                                                  add_special_tokens=True,
-                                                                  max_length=sentence_max_len, )
-            input_ids, token_type_ids = inputs_ls_cased["input_ids"], inputs_ls_cased["token_type_ids"]
-
-            attention_mask = [1 if mask_padding_with_zero else 0] * len(input_ids)
-
-            padding_length = sentence_max_len - len(input_ids)
-            if not pad_on_right:
-                input_ids = ([pad_token] * padding_length) + input_ids
-                attention_mask = ([0 if mask_padding_with_zero else 1] * padding_length) + attention_mask
-                token_type_ids = ([pad_token_segment_id] * padding_length) + token_type_ids
-            else:
-                input_ids = input_ids + ([pad_token] * padding_length)
-                attention_mask = attention_mask + ([0 if mask_padding_with_zero else 1] * padding_length)
-                token_type_ids = token_type_ids + ([pad_token_segment_id] * padding_length)
-
-            input_ids_batch.append(input_ids)
-            token_type_ids_batch.append(token_type_ids)
-            attention_mask_batch.append(attention_mask)
-
-        input_ids_batch = torch.tensor(input_ids_batch, device=self.device)
-        token_type_ids_batch = torch.tensor(token_type_ids_batch, device=self.device)
-        attention_mask_batch = torch.tensor(attention_mask_batch, device=self.device)
-        result = {
-            'input_ids_batch': input_ids_batch,
-            'token_type_ids_batch': token_type_ids_batch,
-            'attention_mask_batch': attention_mask_batch,
-            'labels': labels
-        }
+        result = self._count_of_parameter(model_list=model_list, name_list=name_list)
         return result
 
-    def forward(self, *input_data, **kwargs):
-        if len(kwargs) > 0: # common run or visualization
-            data_batch = kwargs
-            input_ids_batch = data_batch['input_ids_batch']
-            token_type_ids_batch = data_batch['token_type_ids_batch']
-            attention_mask_batch = data_batch['attention_mask_batch']
-            labels = data_batch['labels']
-        else:
-            input_ids_batch, token_type_ids_batch, attention_mask_batch, labels = input_data
+    def forward(self, **kwargs):
+        if len(kwargs) == 0:
+            raise ValueError
 
+        input_ids_batch = kwargs['input_ids']
+        token_type_ids_batch = kwargs['token_type_ids']
+        attention_mask_batch = kwargs['attention_mask']
+        labels = kwargs['labels']
 
         if not self.with_linear_head:
-            last_hidden_states, pooled_output = self.bert(input_ids_batch, token_type_ids_batch, attention_mask_batch)
+            last_hidden_states, pooled_output = self.encoder(input_ids_batch, token_type_ids_batch, attention_mask_batch)
             output = self.dropout(pooled_output)
             predicts = self.classifier(output)
-            if self.arg_dict['task_type'] == 'classification':
+            if self.args.num_labels > 1:
                 if torch.isnan(last_hidden_states).sum() > 0:
                     print(torch.isnan(last_hidden_states))
                     raise ValueError
                 loss = torch.nn.CrossEntropyLoss()(predicts.view(-1, 2), labels.view(-1))
-                predicts = np.array(predicts.detach().cpu().numpy()).argmax(axis=1)
-            elif self.arg_dict['task_type'] == 'regression':
+            elif self.args.num_labels == 1:
                 loss = torch.nn.MSELoss()(predicts.view(-1), labels.view(-1))
-                predicts = np.array(predicts.detach().cpu().numpy().copy()).reshape(-1)
-
             else:
                 raise ValueError
+
+            outputs = loss, predicts
 
         else:
-            loss, outputs = self.bert(input_ids_batch, token_type_ids_batch, attention_mask_batch, labels)
-            if self.arg_dict['task_type'] == 'classification':
-                predicts = outputs
-                loss = torch.nn.CrossEntropyLoss()(predicts.view(-1, 2), labels.view(-1))
-                predicts = np.array(predicts.detach().cpu().numpy()).argmax(axis=1)
-
-            elif self.arg_dict['task_type'] == 'regression':
-                loss = torch.nn.MSELoss()(outputs.view(-1), labels.view(-1))
-                predicts = np.array(outputs.detach().cpu().numpy().copy()).reshape(-1)
-            else:
-                raise ValueError
-        return loss, predicts
-
-    def get_input_of_visualize_model(self, example_ids, example_dict):
-        data_batch = self.deal_with_example_batch(example_ids[0:1], example_dict)
-
-        input_ids_batch = data_batch['input_ids_batch']
-        token_type_ids_batch = data_batch['token_type_ids_batch']
-        attention_mask_batch = data_batch['attention_mask_batch']
-        labels = data_batch['labels']
-
-        input_data = input_ids_batch, token_type_ids_batch, attention_mask_batch, labels
-
-        return input_data
+            outputs = self.encoder(input_ids_batch, token_type_ids_batch, attention_mask_batch, labels)
+        return outputs
 
 

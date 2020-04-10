@@ -26,3 +26,5 @@ result/visualization
 #/**/result
 /**/runs
 /**/*.json
+/**/glue_data
+

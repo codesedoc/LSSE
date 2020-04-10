@@ -18,10 +18,12 @@
 import logging
 import os
 
-from glue.utils import DataProcessor, InputExample, InputFeatures
+from glue.utils import DataProcessor, InputExample, InputFeatures, InputFeaturesWithGCN, TensorDictDataset
 import torch
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
 from glue.mrpc import MrpcProcessor
+import utils.general_tool as general_tool
+from transformers import glue_compute_metrics as compute_metrics
 
 
 logger = logging.getLogger(__name__)
@@ -67,8 +69,10 @@ glue_output_modes = {
 
 
 def glue_convert_examples_to_features(
+    args,
     examples,
     tokenizer,
+    framework_name,
     max_length=512,
     task=None,
     label_list=None,
@@ -116,7 +120,6 @@ def glue_convert_examples_to_features(
 
     features = []
     for (ex_index, example) in enumerate(examples):
-        len_examples = 0
         len_examples = len(examples)
         if ex_index % 10000 == 0:
             logger.info("Writing example %d/%d" % (ex_index, len_examples))
@@ -154,6 +157,24 @@ def glue_convert_examples_to_features(
         else:
             raise KeyError(output_mode)
 
+        sep_indexes = []
+        sep_token = tokenizer.convert_tokens_to_ids([tokenizer.sep_token])[0]
+        for sep_index, id_ in enumerate(input_ids.copy()):
+            if id_ == sep_token:
+                sep_indexes.append(sep_index)
+
+        if len(sep_indexes) != 2:
+            raise ValueError
+
+        sep_index = sep_indexes[0]
+        text_a_len = sep_indexes[0] - 1
+        text_b_len = sep_indexes[1] - sep_indexes[0] - 1
+
+        word_piece_flags = general_tool.word_piece_flag_list(tokenizer.convert_ids_to_tokens(input_ids.copy()), '##')
+
+        if text_a_len <= 0 or text_b_len <= 0:
+            raise ValueError
+
         if ex_index < 5:
             logger.info("*** Example ***")
             logger.info("guid: %s" % (example.guid))
@@ -162,10 +183,22 @@ def glue_convert_examples_to_features(
             logger.info("token_type_ids: %s" % " ".join([str(x) for x in token_type_ids]))
             logger.info("label: %s (id = %d)" % (example.label, label))
 
-        features.append(
-            InputFeatures(
-                input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids, label=label
+        if args.framework_name in ['LSSE', 'LSyE']:
+            input_feature = InputFeaturesWithGCN(
+                args,
+                input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids, label=label,
+                example=example, sep_index=sep_index, text_a_len=text_a_len, text_b_len=text_b_len,
+                word_piece_flags=word_piece_flags
             )
+        else:
+            input_feature = InputFeatures(
+                args,
+                input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids, label=label,
+                example=example,
+            )
+
+        features.append(
+            input_feature
         )
 
     return features
@@ -483,11 +516,14 @@ def glue_convert_examples_to_features(
 
 
 def load_and_cache_examples(
+        args,
         task,
         tokenizer,
         model_type,
         model_name_or_path,
+        framework_name,
         evaluate=False,
+        test=False,
         max_seq_length=512,
         max_sent_length=50,
         overwrite_cache=False,
@@ -502,11 +538,22 @@ def load_and_cache_examples(
         data_dir = processor.data_path
     output_mode = glue_output_modes[task]
 
+    if evaluate and test:
+        raise ValueError
+
+    if evaluate:
+        data_set_type = 'dev'
+    elif test:
+        data_set_type = 'test'
+    else:
+        data_set_type = 'train'
+
     # Load data features from cache or dataset file
     cached_features_file = os.path.join(
         data_dir,
-        "cached_{}_{}_{}_{}".format(
-            "dev" if evaluate else "train",
+        "cached_{}_{}_{}_{}_{}".format(
+            args.framework_name,
+            data_set_type,
             list(filter(None, model_name_or_path.split("/"))).pop(),
             str(max_seq_length),
             str(task),
@@ -521,12 +568,18 @@ def load_and_cache_examples(
         if task in ["mnli", "mnli-mm"] and model_type in ["roberta", "xlmroberta"]:
             # HACK(label indices are swapped in RoBERTa pretrained model)
             label_list[1], label_list[2] = label_list[2], label_list[1]
+
         examples = (
-            processor.get_dev_examples(data_dir) if evaluate else processor.get_train_examples(data_dir)
+            processor.get_examples(data_dir=data_dir, set_type=data_set_type)
         )
+        if args.framework_name in args.framework_with_gcn:
+            processor.add_root_to_text_of_example()
+
         features = glue_convert_examples_to_features(
+            args,
             examples,
             tokenizer,
+            framework_name,
             label_list=label_list,
             max_length=max_seq_length,
             output_mode=output_mode,
@@ -552,8 +605,46 @@ def load_and_cache_examples(
     else:
         all_labels = None
         raise ValueError
+    dataset_item = {
+        'e_id':  torch.tensor([f.e_id for f in features], dtype=torch.int)
+    }
+    if args.framework_name in ['LSSE', 'LSyE']:
+        all_sep_index = torch.tensor([f.sep_index for f in features], dtype=torch.int)
+        all_word_piece_flags = torch.tensor([f.word_piece_flags for f in features], dtype=torch.int)
+        all_text_a_org_len = torch.tensor([f.text_a_org_len for f in features], dtype=torch.int)
+        all_text_a_len = torch.tensor([f.text_a_len for f in features], dtype=torch.int)
+        all_adj_matrix_a = torch.tensor([f.adj_matrix_a for f in features], dtype=torch.int)
+        all_sent_a_id = torch.tensor([f.sent_a_id for f in features], dtype=torch.int)
 
-    dataset = TensorDataset(all_input_ids, all_attention_mask, all_token_type_ids, all_labels)
+        all_text_b_org_len = torch.tensor([f.text_b_org_len for f in features], dtype=torch.int)
+        all_text_b_len = torch.tensor([f.text_b_len for f in features], dtype=torch.int)
+        all_adj_matrix_b = torch.tensor([f.adj_matrix_b for f in features], dtype=torch.int)
+
+        dataset_item.update({
+            'input_ids': all_input_ids,
+            'attention_mask': all_attention_mask,
+            'token_type_ids': all_token_type_ids,
+            'labels': all_labels,
+            'sep_index': all_sep_index,
+            'word_piece_flags': all_word_piece_flags,
+            'sent1_org_len': all_text_a_org_len,
+            'sent1_len': all_text_a_len,
+            'adj_matrix1': all_adj_matrix_a,
+            'sent1_id': all_sent_a_id,
+            'sent2_org_len': all_text_b_org_len,
+            'sent2_len': all_text_b_len,
+            'adj_matrix2': all_adj_matrix_b,
+        })
+
+    else:
+        dataset_item.update({
+            'input_ids': all_input_ids,
+            'attention_mask': all_attention_mask,
+            'token_type_ids': all_token_type_ids,
+            'labels': all_labels
+        })
+
+    # dataset = TensorDataset(all_input_ids, all_attention_mask, all_token_type_ids, all_labels)
+    dataset = TensorDictDataset(dataset_item)
     return dataset
 
-from transformers import glue_compute_metrics as compute_metrics
