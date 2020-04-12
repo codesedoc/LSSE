@@ -4,6 +4,48 @@ import utils.file_tool as file_tool
 import utils.SimpleProgressBar as progress_bar
 
 
+dependency2group_dict = {
+    'dep': 'group1',
+    'aux': 'group1',
+    'auxpass': 'group1',
+    'cop': 'group1',
+
+    'ccomp': 'group2',
+    'xcomp': 'group2',
+    'dobj': 'group2',
+    'iobj': 'group2',
+
+    'nsubj': 'group3',
+    'nsubjpass': 'group3',
+    'csubj': 'group3',
+    'csubjpass': 'group3',
+
+    'cc': 'group4',
+    'conj': 'group4',
+    'expl': 'group4',
+    'amod': 'group4',
+    'appos': 'group4',
+    'advcl': 'group4',
+    'advmod': 'group4',
+    'det': 'group4',
+    'mwe': 'group4',
+    'mark': 'group4',
+    'neg': 'group4',
+    'parataxis': 'group4',
+    'ref': 'group4',
+    'nmod': 'group4',
+    'nummod': 'group4',
+    'compound': 'group4',
+    'case': 'group4',
+    'acl': 'group4',
+
+    'discourse': 'group5',
+
+    # 'list': 'group6',
+}
+group_count = len(set(dependency2group_dict.values()))
+
+
 class ParseInfo:
     def __init__(self, **kwargs):
         super().__init__()
@@ -147,7 +189,16 @@ def extra_parsed_sentence_dict_from_org_file(org_file):
 #     return parsed_sentence_dict
 
 def group_dependencies(parsing_sentence_dict):
-    pass
+    type_set = set()
+    for sent_id, parsing_info in parsing_sentence_dict.items():
+        for dependency in parsing_info['dependencies']:
+            group = dependency2group_dict[dependency['name']]
+            dependency['name'] = group
+            type_set.add(dependency['name'])
+
+    if len(type_set) != group_count:
+        raise ValueError
+    return parsing_sentence_dict
 
 def delete_root_dependency(parsing_sentence_dict):
     for sent_id, parsing_info in parsing_sentence_dict.items():
@@ -184,12 +235,15 @@ def modify_dependency_name(parsing_sentence_dict):
     return parsing_sentence_dict
 
 
-def process_parsing_sentence_dict(parsing_sentence_dict, modify_dep_name=False, delete_root_dep=False):
+def process_parsing_sentence_dict(parsing_sentence_dict, modify_dep_name=False, delete_root_dep=False, group=True):
     if modify_dep_name:
         parsing_sentence_dict = modify_dependency_name(parsing_sentence_dict)
 
     if delete_root_dep:
         parsing_sentence_dict = delete_root_dependency(parsing_sentence_dict)
+
+    # if group:
+    #     parsing_sentence_dict = group_dependencies(parsing_sentence_dict)
 
     word_dict = {}
     dependency_dict = {}
@@ -223,6 +277,10 @@ def process_parsing_sentence_dict(parsing_sentence_dict, modify_dep_name=False, 
         if len(error_dependencies_list) > 0:
             error_dependencies_dict[sent_id] = error_dependencies_list
 
+    ##sort dependency
+    dependency_dict = dict(sorted(dependency_dict.items(), key=lambda item: int(item[1]['frequency']), reverse=True))
+
+    ##count error dep
     count_error_dependencies = 0
     for error_dependencies in error_dependencies_dict.values():
         count_error_dependencies += len(error_dependencies)
@@ -266,6 +324,11 @@ def process_parsing_sentence_dict(parsing_sentence_dict, modify_dep_name=False, 
     if len(id2word_dict) != word_count or len(id2dependency_dict) != dependency_count:
         raise RuntimeError
 
+    dependency_save_data = ['\t'.join((item[0], str(item[1]['frequency']), str(item[1]['id']))) for item in dependency_dict.items()]
+    dependency_save_data.insert(0, "\t".join(['name', 'frequency', 'id']))
+    file_tool.save_list_data(dependency_save_data, 'data_preprocess/dependency.txt', 'w')
+
+    ## numeral words and dependencies of sentences
     numeral_sentence_dict = {}
     error_parsing_sentence = []
     for sent_id, parsing_info in parsing_sentence_dict.items():
