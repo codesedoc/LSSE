@@ -113,9 +113,9 @@ class InputExample(object):
         self.guid = guid
         self.id = id
         self.with_root_head = False
-        self.text_a = sent_a.original_sentence()
+        self.text_a = sent_a.sentence_with_root_head()
         if sent_b is not None:
-            self.text_b = sent_b.original_sentence()
+            self.text_b = sent_b.sentence_with_root_head()
         else:
             self.text_b = None
 
