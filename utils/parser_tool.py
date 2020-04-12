@@ -239,8 +239,8 @@ def process_parsing_sentence_dict(parsing_sentence_dict, modify_dep_name=False, 
     if modify_dep_name:
         parsing_sentence_dict = modify_dependency_name(parsing_sentence_dict)
 
-    if delete_root_dep:
-        parsing_sentence_dict = delete_root_dependency(parsing_sentence_dict)
+    # if delete_root_dep:
+    #     parsing_sentence_dict = delete_root_dependency(parsing_sentence_dict)
 
     # if group:
     #     parsing_sentence_dict = group_dependencies(parsing_sentence_dict)

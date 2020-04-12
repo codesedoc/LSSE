@@ -158,7 +158,7 @@ def create_args():
     parser.add_argument(
         "--overwrite_cache", action="store_true", help="Overwrite the cached training and evaluation sets",
     )
-    parser.add_argument("--seed", type=int, default=42, help="random seed for initialization")
+    parser.add_argument("--seed", type=int, default=1234, help="random seed for initialization")
 
     parser.add_argument(
         "--fp16",
@@ -234,7 +234,7 @@ def create_args():
         args.gcn_group_layer_limit_flag = False
         if args.gcn_group_layer_limit_flag:
             args.gcn_dep_layer_limit_list = [6, 5, 4, 3, 2]
-        args.gcn_dropout = 1.0
+        args.gcn_dropout = 0.1
         args.gcn_position_encoding_flag = True
 
         args.fully_scales = [args.gcn_hidden_dim * 2, 2]
