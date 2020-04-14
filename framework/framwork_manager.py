@@ -389,7 +389,7 @@ class FrameworkManager:
             self.logger.info("Saving model checkpoint to %s", checkpoint_dir)
             # Save a trained model, configuration and tokenizer using `save_pretrained()`.
 
-            self.save(checkpoint_dir)
+            # self.save(checkpoint_dir)
 
         # Evaluation
         result = None

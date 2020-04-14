@@ -5,8 +5,8 @@ import utils.general_tool as general_tool
 import utils.file_tool as file_tool
 import torch
 import logging
-import analysis.error_analysis as er_analysis
-import analysis.mrpc_analysis as mrpc_analysis
+# import analysis.error_analysis as er_analysis
+# import analysis.mrpc_analysis as mrpc_analysis
 from model import MODEL_CLASSES, ALL_MODELS
 from glue.glue_manager import glue_processors as processors
 import os
@@ -52,6 +52,22 @@ def create_args():
     )
 
     # Other parameters
+    parser.add_argument(
+        "-td",
+        "--transformer_dropout",
+        type=float,
+        default=0,
+        help="The probability of hidden layer of transformer.",
+    )
+
+    parser.add_argument(
+        "-gd",
+        "--gcn_dropout",
+        type=float,
+        default=0.1,
+        help="The probability of hidden layer of gcn.",
+    )
+
     parser.add_argument(
         "-f",
         "--framework_name",
@@ -218,6 +234,14 @@ def create_args():
         level=logging.INFO if args.local_rank in [-1, 0] else logging.WARN,
     )
 
+    if args.transformer_dropout < 0 or args.transformer_dropout > 1:
+        raise ValueError
+    args.transformer_dropout = round(args.transformer_dropout, 1)
+
+    if args.gcn_dropout < 0 or args.gcn_dropout > 1:
+        raise ValueError
+    args.gcn_dropout = round(args.gcn_dropout, 1)
+
     args.task_name = args.task_name.lower()
     args.device = device
     args.max_sentence_length = 50
@@ -234,7 +258,6 @@ def create_args():
         args.gcn_group_layer_limit_flag = False
         if args.gcn_group_layer_limit_flag:
             args.gcn_dep_layer_limit_list = [6, 5, 4, 3, 2]
-        args.gcn_dropout = 0.1
         args.gcn_position_encoding_flag = True
 
         args.fully_scales = [args.gcn_hidden_dim * 2, 2]
@@ -245,12 +268,19 @@ def create_args():
         del args.gcn_layer
     return args
 
+def check_dropout(model):
+    result = []
+    for m in model.modules():
+        if isinstance(m, torch.nn.Dropout):
+            result.append(m)
+    return result
 
 def run_framework():
     # raise ValueError('my error!')
     args = create_args()
 
     framework_manager = fr.FrameworkManager(args)
+    # dropouts = check_dropout(framework_manager.framework)
     # framework_manager.train_model()
     framework_manager.run()
     # framework_manager.visualize_model()
@@ -288,8 +318,8 @@ def run_hyperor():
 
 def main():
 
-    run_framework()
-    # run_hyperor()
+    # run_framework()
+    run_hyperor()
     # er_analysis.test()
     # mrpc_analysis.test()
     # corpus_test()
@@ -299,7 +329,7 @@ def occupy_gpu():
     memory = []
     while(True):
         try:
-            memory.append(torch.zeros((10,)*4, dtype=torch.double, device=torch.device('cuda', 0)))
+            memory.append(torch.zeros((40,)*4, dtype=torch.double, device=torch.device('cuda', 0)))
         except Exception as e:
             print(e)
             break
@@ -309,9 +339,28 @@ if __name__ == '__main__':
 
     try:
         main()
+        # raise ValueError
     except Exception as e:
-        logging.exception(e)
-        # memory = occupy_gpu()
-        # while(True): pass
+        raise
+        # logging.exception(e)
+        try:
+            memory = occupy_gpu()
+            print('finish apply memory')
+            if len(memory) >1:
+                del memory[len(memory) - 1]
+
+            if len(memory) == 0:
+                m = torch.zeros((10,), dtype=torch.int, device=torch.device('cuda', 0))
+            else:
+                m = memory[0]
+
+            while (True):
+                m * m
+        except Exception as e:
+            m = torch.zeros((10,)*4, dtype=torch.int, device=torch.device('cpu'))
+            print('defeat occupy !')
+            while(True):
+                m * m
+
 
     pass

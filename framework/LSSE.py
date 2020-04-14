@@ -8,7 +8,7 @@ import utils.general_tool as general_tool
 
 import utils.data_tool as data_tool
 from model import *
-import corpus
+# import corpus
 import math
 
 

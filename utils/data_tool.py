@@ -1,5 +1,5 @@
 import torch.utils.data as torch_data
-import corpus.base_corpus as base_corpus
+# import corpus.base_corpus as base_corpus
 import random
 import numpy as np
 import torch
