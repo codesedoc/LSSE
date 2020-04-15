@@ -9,19 +9,31 @@ import logging
 
 
 class Hyperor:
-    def __init__(self, args):
+    def __init__(self, args=None, study_path=None, study_name=None):
         super().__init__()
         self.args = args
         # self.start_up_trials = 5
-        self.study_path = file_tool.connect_path("result", self.args.framework_name, 'optuna')
-        file_tool.makedir(self.study_path)
-        self.study = optuna.create_study(study_name=self.args.framework_name,
-                                         storage='sqlite:///' + file_tool.connect_path(self.study_path, 'study_hyper_parameter.db'),
-                                         load_if_exists=True,
-                                         pruner=optuna.pruners.MedianPruner())
+        if args!=None:
+            self.study_path = file_tool.connect_path("result", self.args.framework_name, 'optuna')
+            file_tool.makedir(self.study_path)
+            self.study = optuna.create_study(study_name=self.args.framework_name,
+                                             storage='sqlite:///' + file_tool.connect_path(self.study_path, 'study_hyper_parameter.db'),
+                                             load_if_exists=True,
+                                             pruner=optuna.pruners.MedianPruner())
+            logger_filename = file_tool.connect_path(self.study_path, 'log.txt')
+        else:
+            self.study_path = study_path
+            self.study = optuna.create_study(study_name=study_name,
+                                             storage='sqlite:///' + file_tool.connect_path(study_path,
+                                                                                           'study_hyper_parameter.db'),
+                                             load_if_exists=True,
+                                             pruner=optuna.pruners.MedianPruner())
+            logger_filename = file_tool.connect_path(self.study_path, 'log_analysis.txt')
+        self.logger = log_tool.get_logger('my_optuna', logger_filename,
+                                          log_format=logging.Formatter("%(asctime)s - %(message)s",
+                                                                       datefmt="%Y-%m-%d %H:%M:%S"))
         # n_startup_trials = self.start_up_trials, n_warmup_steps = 10
-        logger_filename = file_tool.connect_path(self.study_path, 'log.txt')
-        self.logger = log_tool.get_logger('my_optuna', logger_filename, log_format=logging.Formatter("%(asctime)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
+
         # self.batch_size_list = [8, 16, 32]
         self.learn_rate_list = [5e-5, 3e-5, 2e-5, 1e-5]
         self.transformer_dropout_list = [0, 0.05, 0.1]
@@ -33,7 +45,7 @@ class Hyperor:
         # self.args.per_gpu_train_batch_size = self.batch_size_list[trial.suggest_int('batch_size_index', 0, len(self.batch_size_list)-1)]
         self.args.per_gpu_train_batch_size = 8
         self.args.per_gpu_eval_batch_size = self.args.per_gpu_train_batch_size
-        self.args.num_train_epochs = 3
+        self.args.num_train_epochs = trial.suggest_int('epoch', 3, 4)
 
         self.args.transformer_dropout = self.transformer_dropout_list[
             trial.suggest_int('transformer_dropout_index', 0, len(self.transformer_dropout_list) - 1)]
@@ -67,6 +79,11 @@ class Hyperor:
         if hasattr(trial, 'state'):
             self.logger.info('state:{}'.format(trial.state))
         self.logger.info('*'*80+'\n')
+
+    def show_best_trial(self):
+        # print(dict(self.study.best_trial.params))
+        self.log_trial(self.study.best_trial, 'best trial info')
+
 
     def tune_hyper_parameter(self):
         self.study.optimize(self.objective, n_trials=self.trial_times)
