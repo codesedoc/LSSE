@@ -8,7 +8,7 @@ import utils.general_tool as general_tool
 
 import utils.data_tool as data_tool
 from model import *
-import corpus
+# import corpus
 import math
 
 
@@ -372,4 +372,30 @@ class LSSE(fr.Framework):
         result = self._count_of_parameter(model_list=model_list, name_list=name_list)
         return result
 
+    def optimizer_grouped_parameters(self):
+        no_decay = ["bias", "LayerNorm.weight"]
+        result = [
+                    {
+                        "params": [p for n, p in self.gcn.named_parameters() if not any(nd in n for nd in no_decay)],
+                        "weight_decay": self.args.weight_decay,
+                        "lr": self.args.learning_rate
+                    },
+                    {
+                        "params": [p for n, p in self.gcn.named_parameters() if any(nd in n for nd in no_decay)],
+                        "weight_decay": 0.0,
+                        "lr": self.args.learning_rate
+                    },
+
+                    {
+                        "params": [p for n, p in self.encoder.named_parameters() if not any(nd in n for nd in no_decay)],
+                        "weight_decay": self.args.weight_decay,
+                    },
+
+                    {
+                        "params": [p for n, p in self.fully_connection.named_parameters() if not any(nd in n for nd in no_decay)],
+                        "weight_decay": self.args.weight_decay,
+                    },
+                ]
+
+        return result
 

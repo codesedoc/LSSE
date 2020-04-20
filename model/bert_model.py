@@ -6,7 +6,9 @@ class BertBase(torch.nn.Module):
         super().__init__()
         self.args = args
         self.config = torch.hub.load('huggingface/pytorch-transformers', 'config', self.args.model_name_or_path,
-                                     num_labels=args.num_labels,
+                                     # hidden_dropout_prob=self.args.transformer_dropout,
+                                     # attention_probs_dropout_prob=self.args.transformer_dropout,
+                                     num_labels=self.args.num_labels,
                                      finetuning_task=self.args.task_name,
                                      cache_dir=self.args.cache_dir if self.args.cache_dir else None)
 

@@ -94,4 +94,19 @@ class SeE(fr.LSeE):
             outputs = self.encoder(input_ids_batch, token_type_ids_batch, attention_mask_batch, labels)
         return outputs
 
+    def optimizer_grouped_parameters(self):
+        no_decay = ["bias", "LayerNorm.weight"]
+        result = [
+                {
+                    "params": [p for n, p in self.named_parameters() if not any(nd in n for nd in no_decay)],
+                    "weight_decay": self.args.weight_decay,
+                },
+                {
+                    "params": [p for n, p in self.named_parameters() if any(nd in n for nd in no_decay)],
+                    "weight_decay": 0.0
+                },
+            ]
+
+        return result
+
 
