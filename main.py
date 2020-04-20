@@ -53,6 +53,14 @@ def create_args():
 
     # Other parameters
     parser.add_argument(
+        "-th",
+        "--tune_hyper",
+        default=False,
+        action="store_true",
+        help="Whether tune hyper-parameter",
+    )
+
+    parser.add_argument(
         "-td",
         "--transformer_dropout",
         type=float,
@@ -174,7 +182,7 @@ def create_args():
     parser.add_argument(
         "--overwrite_cache", action="store_true", help="Overwrite the cached training and evaluation sets",
     )
-    parser.add_argument("--seed", type=int, default=1234, help="random seed for initialization")
+    parser.add_argument("--seed", type=int, default=42, help="random seed for initialization")
 
     parser.add_argument(
         "--fp16",
@@ -250,6 +258,9 @@ def create_args():
     args.encoder_hidden_dim = 768
     args.fully_scales = [args.encoder_hidden_dim * 2, 2]
     args.max_encoder_seq_length = args.max_seq_length
+
+    args.base_learning_rate = 2e-5
+
     if args.framework_name in args.framework_with_gcn:
         args.gcn_hidden_dim = args.encoder_hidden_dim
         args.gcn_gate_flag = True
@@ -275,10 +286,8 @@ def check_dropout(model):
             result.append(m)
     return result
 
-def run_framework():
+def run_framework(args):
     # raise ValueError('my error!')
-    args = create_args()
-
     framework_manager = fr.FrameworkManager(args)
     # dropouts = check_dropout(framework_manager.framework)
     # framework_manager.train_model()
@@ -286,8 +295,7 @@ def run_framework():
     # framework_manager.visualize_model()
 
 
-def run_hyperor():
-    args = create_args()
+def run_hyperor(args):
 
     hyr = hyperor.Hyperor(args)
     hyr.tune_hyper_parameter()
@@ -317,9 +325,12 @@ def run_hyperor():
 #     #                                                 '##')
 
 def main():
+    args = create_args()
+    if args.tune_hyper:
+        run_hyperor(args)
+    else:
+        run_framework(args)
 
-    # run_framework()
-    run_hyperor()
     # er_analysis.test()
     # mrpc_analysis.test()
     # corpus_test()

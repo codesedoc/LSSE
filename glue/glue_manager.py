@@ -135,7 +135,7 @@ class GLUEManager:
             if text_a_len <= 0 or text_b_len <= 0:
                 raise ValueError
 
-            # if ex_index < 5:
+            # if ex_index < 3:
             #     logger.info("*** Example ***")
             #     logger.info("guid: %s" % (example.guid))
             #     logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
@@ -211,9 +211,10 @@ class GLUEManager:
             #     processor.add_root_to_text_of_example()
 
             features = self.convert_examples_to_features(examples, tokenizer)
-            # if local_rank in [-1, 0]:
-            #     logger.info("Saving features into cached file %s", cached_features_file)
-            #     torch.save(features, cached_features_file)
+
+            if local_rank in [-1, 0] and self.args.tune_hyper and self.args.task_name in ['QQP', 'qqp']:
+                logger.info("Saving features into cached file %s", cached_features_file)
+                torch.save(features, cached_features_file)
 
         if local_rank == 0 and not evaluate:
             torch.distributed.barrier()  # Make sure only the first process in distributed training process the dataset, and the others will use the cache

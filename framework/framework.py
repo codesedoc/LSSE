@@ -112,3 +112,7 @@ class Framework(torch.nn.Module):
     def framework_name(cls):
         raise RuntimeError("have not implemented this abstract method")
 
+    @abstractmethod
+    def optimizer_grouped_parameters(self):
+        raise RuntimeError("have not implemented this abstract method")
+

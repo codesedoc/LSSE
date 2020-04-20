@@ -125,19 +125,15 @@ class FrameworkManager:
             t_total = len(train_dataloader) // self.args.gradient_accumulation_steps * self.args.num_train_epochs
 
         # Prepare optimizer and schedule (linear warmup and decay)
-        no_decay = ["bias", "LayerNorm.weight"]
-        optimizer_grouped_parameters = [
-            {
-                "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
-                "weight_decay": self.args.weight_decay,
-            },
-            {"params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], "weight_decay": 0.0},
-        ]
+
+        optimizer_grouped_parameters = self.framework.optimizer_grouped_parameters()
+
         if self.args.optimizer == 'sgd':
-            optimizer = torch.optim.SGD(optimizer_grouped_parameters, lr=self.args.learning_rate,
-                                             momentum=self.args.sgd_momentum)
+            optimizer = torch.optim.SGD(optimizer_grouped_parameters, lr=self.args.base_learning_rate,
+                                             momentum=self.args.sgd_momentum, weight_decay=0.0)
         elif self.args.optimizer == 'adam':
-            optimizer = AdamW(optimizer_grouped_parameters, lr=self.args.learning_rate, eps=self.args.adam_epsilon)
+            optimizer = AdamW(optimizer_grouped_parameters, lr=self.args.base_learning_rate, eps=self.args.adam_epsilon,
+                              weight_decay=0.0)
         else:
             raise ValueError
         scheduler = get_linear_schedule_with_warmup(
@@ -217,10 +213,7 @@ class FrameworkManager:
                     continue
 
                 model.train()
-                # for b in batch:
-                #     print(type(b))
-                # batch = tuple(t.to(self.args.device) for t in batch)
-                # inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
+
                 inputs = batch
                 if self.args.model_type != "distilbert" and self.args.model_type not in ["bert", "xlnet", "albert"] :
                     del inputs["token_type_ids"]
@@ -272,12 +265,13 @@ class FrameworkManager:
                         logs["loss"] = loss_scalar
                         logging_loss = tr_loss
 
-                        for key, value in logs.items():
-                            tb_writer.add_scalar(key, value, global_step)
+                        # for key, value in logs.items():
+                        #     tb_writer.add_scalar(key, value, global_step)
                         # print(json.dumps({**logs, **{"step": global_step}}))
                         self.logger.info(json.dumps({**logs, **{"step": global_step}}))
 
-                    if self.args.local_rank in [-1, 0] and self.args.save_steps > 0 and global_step % self.args.save_steps == 0:
+                    if self.args.local_rank in [-1, 0] and self.args.save_steps > 0 and global_step % self.args.save_steps == 0 \
+                            and not self.args.tune_hyper:
                         # Save model checkpoint
                         checkpoint_dir = file_tool.connect_path(self.args.output_dir, "checkpoint-{}".format(global_step))
                         if not file_tool.check_dir(checkpoint_dir):
@@ -285,6 +279,8 @@ class FrameworkManager:
                         self.save(checkpoint_dir)
                         self.logger.info("Saving model checkpoint to %s", checkpoint_dir)
                         self.logger.info("Saving optimizer and scheduler states to %s", checkpoint_dir)
+
+                    tb_writer.add_scalar("loss", loss.item(), global_step)
 
                 if self.args.max_steps > 0 and global_step > self.args.max_steps:
                     epoch_iterator.close()
@@ -388,8 +384,8 @@ class FrameworkManager:
 
             self.logger.info("Saving model checkpoint to %s", checkpoint_dir)
             # Save a trained model, configuration and tokenizer using `save_pretrained()`.
-
-            # self.save(checkpoint_dir)
+            if self.args.task_name in ['QQP', 'qqp']:
+                self.save(checkpoint_dir)
 
         # Evaluation
         result = None
