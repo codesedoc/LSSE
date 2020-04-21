@@ -3,6 +3,7 @@ import argparse
 import utils.hyperor as hyperor
 import utils.general_tool as general_tool
 import utils.file_tool as file_tool
+import utils.analysis_tool as at
 import torch
 import logging
 # import analysis.error_analysis as er_analysis
@@ -168,7 +169,7 @@ def create_args():
     )
     parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps.")
 
-    parser.add_argument("--logging_steps", type=int, default=500, help="Log every X updates steps.")
+    parser.add_argument("--logging_steps", type=int, default=100, help="Log every X updates steps.")
     parser.add_argument("--save_steps", type=int, default=5000, help="Save checkpoint every X updates steps.")
     parser.add_argument(
         "--eval_all_checkpoints",
@@ -277,6 +278,8 @@ def create_args():
             args.fully_scales[0] += args.gcn_hidden_dim
     else:
         del args.gcn_layer
+
+    args.tensorboard_logdir = None
     return args
 
 def check_dropout(model):
@@ -300,6 +303,10 @@ def run_hyperor(args):
     hyr = hyperor.Hyperor(args)
     hyr.tune_hyper_parameter()
 
+
+def analyze_hyper_parameters(args):
+    analyst = at.HyperParameterAnalyst(args)
+    analyst.analyze_learning_rate()
 
 # def corpus_test():
 #     # corpus.stsb.test()
@@ -326,11 +333,11 @@ def run_hyperor(args):
 
 def main():
     args = create_args()
-    if args.tune_hyper:
-        run_hyperor(args)
-    else:
-        run_framework(args)
-
+    # if args.tune_hyper:
+    #     run_hyperor(args)
+    # else:
+    #     run_framework(args)
+    analyze_hyper_parameters(args)
     # er_analysis.test()
     # mrpc_analysis.test()
     # corpus_test()
