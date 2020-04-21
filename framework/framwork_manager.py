@@ -111,7 +111,7 @@ class FrameworkManager:
         """ Train the model """
         model = self.framework
         if self.args.local_rank in [-1, 0]:
-            tb_writer = SummaryWriter()
+            tb_writer = SummaryWriter(self.args.tensorboard_logdir)
 
         self.args.train_batch_size = self.args.per_gpu_train_batch_size * max(1, self.args.n_gpu)
         train_sampler = RandomSampler(train_dataset) if self.args.local_rank == -1 else DistributedSampler(train_dataset)
@@ -225,7 +225,7 @@ class FrameworkManager:
                 #     )  # XLM, DistilBERT, RoBERTa, and XLM-RoBERTa don't use segment_ids
                 outputs = model(**inputs)
                 loss = outputs[0]  # model outputs are always tuple in transformers (see doc)
-                loss_list.append(loss.item())
+                # loss_list.append(loss.item())
                 if self.args.n_gpu > 1:
                     loss = loss.mean()  # mean() to average on multi-gpu parallel training
                 if self.args.gradient_accumulation_steps > 1:
@@ -254,7 +254,7 @@ class FrameworkManager:
                         if (
                             self.args.local_rank == -1 and self.args.evaluate_during_training
                         ):  # Only evaluate when single GPU otherwise metrics may not average well
-                            results = self.evaluate()
+                            results = self.evaluate(dev_flag=True, test_flag=False, prefix="during_training_")
                             for key, value in results.items():
                                 eval_key = "eval_{}".format(key)
                                 logs[eval_key] = value
@@ -265,8 +265,8 @@ class FrameworkManager:
                         logs["loss"] = loss_scalar
                         logging_loss = tr_loss
 
-                        # for key, value in logs.items():
-                        #     tb_writer.add_scalar(key, value, global_step)
+                        for key, value in logs.items():
+                            tb_writer.add_scalar(key, value, global_step)
                         # print(json.dumps({**logs, **{"step": global_step}}))
                         self.logger.info(json.dumps({**logs, **{"step": global_step}}))
 
@@ -280,7 +280,7 @@ class FrameworkManager:
                         self.logger.info("Saving model checkpoint to %s", checkpoint_dir)
                         self.logger.info("Saving optimizer and scheduler states to %s", checkpoint_dir)
 
-                    tb_writer.add_scalar("loss", loss.item(), global_step)
+                    # tb_writer.add_scalar("loss", loss.item(), global_step)
 
                 if self.args.max_steps > 0 and global_step > self.args.max_steps:
                     epoch_iterator.close()
@@ -329,7 +329,12 @@ class FrameworkManager:
             nb_eval_steps = 0
             preds = None
             out_label_ids = None
-            for batch in tqdm(eval_dataloader, desc="Evaluating"):
+
+            if not self.args.evaluate_during_training:
+                bathes = tqdm(eval_dataloader, desc="Evaluating")
+            else:
+                bathes = eval_dataloader
+            for batch in bathes:
                 model.eval()
                 inputs = batch
                 with torch.no_grad():
@@ -403,7 +408,7 @@ class FrameworkManager:
             prefix = checkpoint.split("/")[-1] if checkpoint.find("checkpoint") != -1 else ""
             if not self.args.do_train:
                 self.load(checkpoint)
-            result = self.evaluate(dev_flag=False, test_flag=True, prefix=prefix)
+            self.evaluate(dev_flag=False, test_flag=True, prefix=prefix)
 
         result['output_dir'] = self.args.output_dir
         optuna_result = 1-result['acc']
