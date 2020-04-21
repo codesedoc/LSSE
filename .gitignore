@@ -25,6 +25,7 @@ result/visualization
 /**/*.csv
 #/**/result
 /**/runs
+/**/tensorboard
 /**/*.json
 /**/glue_data
 

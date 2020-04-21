@@ -202,6 +202,8 @@ class FrameworkManager:
         #     epochs_trained, int(args.num_train_epochs), desc="Epoch", disable=args.local_rank not in [-1, 0],
         # )
         loss_list = []
+        np_predicts = None
+        np_labels = None
         general_tool.setup_seed(self.args.seed)  # Added here for reproductibility
         for _ in range(int(self.args.num_train_epochs)):
             epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=self.args.local_rank not in [-1, 0])
@@ -226,6 +228,12 @@ class FrameworkManager:
                 outputs = model(**inputs)
                 loss = outputs[0]  # model outputs are always tuple in transformers (see doc)
                 # loss_list.append(loss.item())
+                logits = outputs[1]
+                np_predicts, np_labels = self.append_np_predict_label(predicts=np_predicts,
+                                             new_predicts=logits.detach().cpu().numpy().copy(),
+                                             labels=np_labels,
+                                             new_labels=inputs["labels"].detach().cpu().numpy().copy())
+
                 if self.args.n_gpu > 1:
                     loss = loss.mean()  # mean() to average on multi-gpu parallel training
                 if self.args.gradient_accumulation_steps > 1:
@@ -254,16 +262,31 @@ class FrameworkManager:
                         if (
                             self.args.local_rank == -1 and self.args.evaluate_during_training
                         ):  # Only evaluate when single GPU otherwise metrics may not average well
-                            results = self.evaluate(dev_flag=True, test_flag=False, prefix="during_training_")
-                            for key, value in results.items():
-                                eval_key = "eval_{}".format(key)
-                                logs[eval_key] = value
+                            dev_results = self.evaluate(dev_flag=True, test_flag=False, prefix="during_training")
+                            test_results = self.evaluate(dev_flag=False, test_flag=True, prefix="during_training")
+
+                            for key, value in dev_results.items():
+                                dev_key = "{}_dev".format(key)
+                                logs[dev_key] = value
+
+                            for key, value in test_results.items():
+                                test_key = "{}_test".format(key)
+                                logs[test_key] = value
 
                         loss_scalar = (tr_loss - logging_loss) / self.args.logging_steps
                         learning_rate_scalar = scheduler.get_last_lr()[0]
                         logs["learning_rate"] = learning_rate_scalar
                         logs["loss"] = loss_scalar
                         logging_loss = tr_loss
+
+                        if self.args.output_mode == "classification":
+                            np_predicts = np.argmax(np_predicts, axis=1)
+                        elif self.args.output_mode == "regression":
+                            np_predicts = np.squeeze(np_predicts)
+                        metrics_result = self.glue_manager.compute_metrics(self.args.task_name, np_predicts, np_labels)
+                        logs['acc_train'] = metrics_result['acc']
+                        np_predicts = None
+                        np_labels = None
 
                         for key, value in logs.items():
                             tb_writer.add_scalar(key, value, global_step)
@@ -291,14 +314,24 @@ class FrameworkManager:
         # file_tool.save_data_pickle(loss_list, 'analysis/baseline/run_on_my_pc/cuda/loss_list.pkl')
         return global_step, tr_loss / global_step
 
+    def append_np_predict_label(self, predicts, labels, new_predicts, new_labels):
+        if predicts is None:
+            predicts = new_predicts
+            labels = new_labels
+        else:
+            predicts = np.append(predicts, new_predicts, axis=0)
+            labels = np.append(labels, new_labels, axis=0)
+
+        return predicts, labels
+
     def evaluate(self,  dev_flag, test_flag, prefix=""):
         if (dev_flag and test_flag) or not (dev_flag or test_flag):
             raise ValueError
 
         if dev_flag:
-            prefix += "dev"
+            prefix += "_dev"
         else:
-            prefix += "train"
+            prefix += "_train"
         # Loop to handle MNLI double evaluation (matched, mis-matched)
         model = self.framework
         eval_task_names = ("mnli", "mnli-mm") if self.args.task_name == "mnli" else (self.args.task_name,)
@@ -347,7 +380,7 @@ class FrameworkManager:
                     tmp_eval_loss, logits = outputs
 
                     eval_loss += tmp_eval_loss.mean().item()
-                nb_eval_steps += 1
+                    nb_eval_steps += 1
                 if preds is None:
                     preds = logits.detach().cpu().numpy()
                     out_label_ids = inputs["labels"].detach().cpu().numpy()
@@ -361,6 +394,7 @@ class FrameworkManager:
             elif self.args.output_mode == "regression":
                 preds = np.squeeze(preds)
             result = self.glue_manager.compute_metrics(eval_task, preds, out_label_ids)
+            result['loss'] = eval_loss
             results.update(result)
 
             output_eval_file = file_tool.connect_path(eval_output_dir, "eval_{}_results.txt".format(prefix))
