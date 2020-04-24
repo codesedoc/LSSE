@@ -303,11 +303,11 @@ class FrameworkManager:
             test_results = self.evaluate(dev_flag=False, test_flag=True, prefix="during_training")
 
             for dev_key, test_key in zip(dev_results, test_results):
-                dev_key = "{}_dev".format(dev_key)
-                logs[dev_key] = dev_results[dev_key]
+                dev_log_key = "{}_dev".format(dev_key)
+                logs[dev_log_key] = dev_results[dev_key]
 
-                test_key = "{}_test".format(test_key)
-                logs[test_key] = test_results[test_key]
+                test_log_key = "{}_test".format(test_key)
+                logs[test_log_key] = test_results[test_key]
 
             logs['dev_test_acc'] = (dev_results['acc'] + test_results['acc']) / 2
 
