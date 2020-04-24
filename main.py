@@ -303,6 +303,8 @@ def run_hyperor(args):
     hyr = hyperor.Hyperor(args)
     hyr.tune_hyper_parameter()
 
+    del hyr
+
 
 def analyze_hyper_parameters(args):
     analyst = at.HyperParameterAnalyst(args)
