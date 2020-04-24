@@ -10,11 +10,12 @@ import utils.data_tool as data_tool
 from model import *
 # import corpus
 import math
+import socket
 
 
 class LSSE(fr.Framework):
     name = "LSSE"
-    result_path = file_tool.connect_path('result', name)
+    result_path = file_tool.connect_path('result', str(socket.gethostname()), name)
 
     def __init__(self, args):
         self.encoder = None
