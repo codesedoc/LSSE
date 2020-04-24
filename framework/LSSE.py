@@ -61,17 +61,11 @@ class LSSE(fr.Framework):
         super().update_args()
         if self.args.do_train:
             time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
-            if self.args.gcn_group_layer_limit_flag:
-                gl = self.args.gcn_group_layer_limit_list
-            else:
-                gl = self.args.gcn_layer
+
 
             output_dir = file_tool.connect_path(self.result_path,
                                                'train',
-                                               'bs:{}-lr:{}-gl:{}--com_fun:{}'.
-                                               format(self.args.per_gpu_train_batch_size,
-                                                      self.args.learning_rate, gl,
-                                                      self.args.semantic_compare_func),
+                                               self.get_name_in_result_path(),
                                                time_str)
             file_tool.makedir(output_dir)
             if not file_tool.check_dir(output_dir):
@@ -398,4 +392,22 @@ class LSSE(fr.Framework):
                 ]
 
         return result
+
+    def get_name_in_result_path(self):
+
+        if self.args.gcn_group_layer_limit_flag:
+            gl = self.args.gcn_group_layer_limit_list
+        else:
+            gl = self.args.gcn_layer
+
+        return 'blr-{}_lr-{}_bs-{}_gl-{}_td-{}_gd-{}_wd-{}_comfun-{}'.format(
+            self.args.base_learning_rate,
+            self.args.learning_rate,
+            self.args.per_gpu_train_batch_size,
+            gl,
+            self.args.transformer_dropout,
+            self.args.gcn_dropout,
+            self.args.weight_decay,
+            self.args.semantic_compare_func,
+        )
 

@@ -35,7 +35,7 @@ class HyperParameterAnalyst:
     def analyze_learning_rate(self):
         lrs = [j * math.pow(10, -i)for j in [2, 5, 8] for i in range(1, 8)]
         # lrs = [0.005]
-        base_path = 'tensorboard/learning_rate'
+        base_path = 'tensorboard/tuning_test/learning_rate'
         for lr in lrs:
             self.args.learning_rate = lr
             self.args.tensorboard_logdir = file_tool.connect_path(base_path, str(lr))

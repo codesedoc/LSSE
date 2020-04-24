@@ -116,3 +116,6 @@ class Framework(torch.nn.Module):
     def optimizer_grouped_parameters(self):
         raise RuntimeError("have not implemented this abstract method")
 
+    @abstractmethod
+    def get_name_in_result_path(self):
+        raise RuntimeError("have not implemented this abstract method")

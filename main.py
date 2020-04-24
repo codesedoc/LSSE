@@ -333,11 +333,11 @@ def analyze_hyper_parameters(args):
 
 def main():
     args = create_args()
-    # if args.tune_hyper:
-    #     run_hyperor(args)
-    # else:
-    #     run_framework(args)
-    analyze_hyper_parameters(args)
+    if args.tune_hyper:
+        run_hyperor(args)
+    else:
+        run_framework(args)
+    # analyze_hyper_parameters(args)
     # er_analysis.test()
     # mrpc_analysis.test()
     # corpus_test()
