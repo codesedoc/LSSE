@@ -28,4 +28,6 @@ result/visualization
 /**/tensorboard
 /**/*.json
 /**/glue_data
+*.zip
+/**/*.zip
 
