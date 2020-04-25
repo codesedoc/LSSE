@@ -89,7 +89,7 @@ class Hyperor:
             self.log_trial(self.study.best_trial, 'best trial info')
 
         if str(trial.params) in self.trial_dict:
-            self.logger.warning('trail params: %s  repeat!')
+            self.logger.warning('trail params: %s  repeat!' %(str(trial.params)))
             return self.trial_dict[str(trial.params)]
 
         framework_manager = fr.FrameworkManager(args=self.args, trial=trial)
