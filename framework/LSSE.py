@@ -401,10 +401,11 @@ class LSSE(fr.Framework):
         else:
             gl = self.args.gcn_layer
 
-        return 'blr-{}_lr-{}_bs-{}_gl-{}_td-{}_gd-{}_wd-{}_comfun-{}'.format(
+        return 'blr-{}_lr-{}_bs-{}_ep-{}_gl-{}_td-{}_gd-{}_wd-{}_comfun-{}'.format(
             self.args.base_learning_rate,
             self.args.learning_rate,
             self.args.per_gpu_train_batch_size,
+            self.args.num_train_epochs,
             gl,
             self.args.transformer_dropout,
             self.args.gcn_dropout,
