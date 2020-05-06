@@ -440,3 +440,7 @@ a.add('ada')
 #
 # print(len(hyperor.__dict__))
 # print(len(dir(hyperor)))
+
+import numpy as  np
+
+np.rollaxis
