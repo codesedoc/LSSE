@@ -443,4 +443,35 @@ a.add('ada')
 
 import numpy as  np
 
-np.rollaxis
+# np.rollaxis
+
+
+a = np.arange(27, dtype=np.int8)
+
+print(a)
+a1=a.reshape((3,3,3), order='C')
+print('A1:{}'.format(a1))
+a2=a.reshape((3,3,3), order='F')
+print('A2:{}'.format(a2))
+a11=a.reshape((3,9), order='C')
+print('A11:{}'.format(a11))
+a22 = a.reshape((3,9), order='F')
+print('A22:{}'.format(a22))
+
+
+b1 = a1.reshape((9,3), order='A')
+b2 = a2.reshape((9,3), order='A')
+print('B1:{}'.format(b1))
+
+print('B2:{}'.format(b2))
+
+print(a.strides)
+print(a11.strides)
+print(a22.strides)
+
+print(b1.strides)
+print(b2.strides)
+
+# a[0] = 100
+
+# print('B2:{}'.format(b2))

@@ -115,7 +115,7 @@ class FrameworkManager:
             tb_writer = SummaryWriter(self.args.tensorboard_logdir)
             self.tb_writer = tb_writer
 
-        self.args.train_batch_size = self.args.per_gpu_train_batch_size * max(1, self.args.n_gpu)
+
         train_sampler = RandomSampler(train_dataset) if self.args.local_rank == -1 else DistributedSampler(train_dataset)
         train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=self.args.train_batch_size)
 
@@ -299,8 +299,8 @@ class FrameworkManager:
         if (
                 self.args.local_rank == -1 and self.args.evaluate_during_training
         ):  # Only evaluate when single GPU otherwise metrics may not average well
-            dev_results = self.evaluate(dev_flag=True, test_flag=False, prefix="during_training")
-            test_results = self.evaluate(dev_flag=False, test_flag=True, prefix="during_training")
+            dev_results = self.evaluate(dev_flag=True, test_flag=False, prefix="step({})_during_training)".format(step))
+            test_results = self.evaluate(dev_flag=False, test_flag=True, prefix="step({})_during_training".format(step))
 
             for dev_key, test_key in zip(dev_results, test_results):
                 dev_log_key = "{}_dev".format(dev_key)
@@ -344,6 +344,8 @@ class FrameworkManager:
 
         if dev_flag:
             prefix += "_dev"
+        elif test_flag:
+            prefix += "_test"
         else:
             prefix += "_train"
         # Loop to handle MNLI double evaluation (matched, mis-matched)
