@@ -10,6 +10,7 @@ import logging
 # import analysis.mrpc_analysis as mrpc_analysis
 from model import MODEL_CLASSES, ALL_MODELS
 from glue.glue_manager import glue_processors as processors
+import framework.Elaboration_Fast as EF
 import os
 
 def create_args():
@@ -342,10 +343,11 @@ def analyze_hyper_parameters(args):
 
 def main():
     args = create_args()
-    if args.tune_hyper:
-        run_hyperor(args)
-    else:
-        run_framework(args)
+    EF.run(args)
+    # if args.tune_hyper:
+    #     run_hyperor(args)
+    # else:
+    #     run_framework(args)
     # analyze_hyper_parameters(args)
     # er_analysis.test()
     # mrpc_analysis.test()

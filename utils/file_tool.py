@@ -7,8 +7,8 @@ def get_absolute_path(file):
     return os.path.dirname(file)
 
 
-def load_data(file_name, mode):
-    with open(file_name, mode) as f:
+def load_data(file_name, mode, errors=None):
+    with open(file_name, mode, errors=errors) as f:
         rows = f.readlines()
     return rows
 
