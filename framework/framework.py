@@ -44,8 +44,11 @@ class Framework(torch.nn.Module):
                     parameter_list.append(p.reshape(-1))
                     if name.find('weight') != -1:
                         weights_list.append(p.reshape(-1))
-                    if name.find('bias') != -1:
+                    elif name.find('bias') != -1:
                         bias_list.append(p.reshape(-1))
+                    else:
+                        raise ValueError
+
                 parameters = torch.cat(parameter_list, dim=0)
                 weights = torch.cat(weights_list, dim=0)
                 biases = torch.cat(bias_list, dim=0)
@@ -116,3 +119,6 @@ class Framework(torch.nn.Module):
     def optimizer_grouped_parameters(self):
         raise RuntimeError("have not implemented this abstract method")
 
+    @abstractmethod
+    def get_name_in_result_path(self):
+        raise RuntimeError("have not implemented this abstract method")

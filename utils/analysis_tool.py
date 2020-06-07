@@ -6,7 +6,7 @@ import framework as fr
 class HyperParameterAnalyst:
     def __init__(self, args):
         self.args = args
-        self.max_epoch = 1
+        self.max_epoch = 15
         self.set_hyper_parameters()
         pass
 
@@ -33,9 +33,9 @@ class HyperParameterAnalyst:
         self.args.gcn_position_encoding_flag = True
 
     def analyze_learning_rate(self):
-        # lrs = [j * math.pow(10, -i)for j in [2, 5, 8] for i in range(1, 8)]
-        lrs = [0.005]
-        base_path = 'tensorboard/learning_rate'
+        lrs = [j * math.pow(10, -i)for j in [2, 5, 8] for i in range(1, 8)]
+        # lrs = [0.005]
+        base_path = 'tensorboard/tuning_test/learning_rate'
         for lr in lrs:
             self.args.learning_rate = lr
             self.args.tensorboard_logdir = file_tool.connect_path(base_path, str(lr))

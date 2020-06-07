@@ -12,6 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 import json
 from utils import general_tool
 from model import MODEL_CLASSES
+import socket
 
 # import optuna
 # import glob
@@ -112,8 +113,9 @@ class FrameworkManager:
         model = self.framework
         if self.args.local_rank in [-1, 0]:
             tb_writer = SummaryWriter(self.args.tensorboard_logdir)
+            self.tb_writer = tb_writer
 
-        self.args.train_batch_size = self.args.per_gpu_train_batch_size * max(1, self.args.n_gpu)
+
         train_sampler = RandomSampler(train_dataset) if self.args.local_rank == -1 else DistributedSampler(train_dataset)
         train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=self.args.train_batch_size)
 
@@ -205,7 +207,7 @@ class FrameworkManager:
         np_predicts = None
         np_labels = None
         general_tool.setup_seed(self.args.seed)  # Added here for reproductibility
-        for _ in range(int(self.args.num_train_epochs)):
+        for epoch_index in range(int(self.args.num_train_epochs)):
             epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=self.args.local_rank not in [-1, 0])
             for step, batch in enumerate(epoch_iterator):
 
@@ -257,41 +259,12 @@ class FrameworkManager:
                     model.zero_grad()
                     global_step += 1
 
-                    if self.args.local_rank in [-1, 0] and self.args.logging_steps > 0 and global_step % self.args.logging_steps == 0:
-                        logs = {}
-                        if (
-                            self.args.local_rank == -1 and self.args.evaluate_during_training
-                        ):  # Only evaluate when single GPU otherwise metrics may not average well
-                            dev_results = self.evaluate(dev_flag=True, test_flag=False, prefix="during_training")
-                            test_results = self.evaluate(dev_flag=False, test_flag=True, prefix="during_training")
-
-                            for key, value in dev_results.items():
-                                dev_key = "{}_dev".format(key)
-                                logs[dev_key] = value
-
-                            for key, value in test_results.items():
-                                test_key = "{}_test".format(key)
-                                logs[test_key] = value
-
-                        loss_scalar = (tr_loss - logging_loss) / self.args.logging_steps
-                        learning_rate_scalar = scheduler.get_last_lr()[0]
-                        logs["learning_rate"] = learning_rate_scalar
-                        logs["loss"] = loss_scalar
-                        logging_loss = tr_loss
-
-                        if self.args.output_mode == "classification":
-                            np_predicts = np.argmax(np_predicts, axis=1)
-                        elif self.args.output_mode == "regression":
-                            np_predicts = np.squeeze(np_predicts)
-                        metrics_result = self.glue_manager.compute_metrics(self.args.task_name, np_predicts, np_labels)
-                        logs['acc_train'] = metrics_result['acc']
-                        np_predicts = None
-                        np_labels = None
-
-                        for key, value in logs.items():
-                            tb_writer.add_scalar(key, value, global_step)
-                        # print(json.dumps({**logs, **{"step": global_step}}))
-                        self.logger.info(json.dumps({**logs, **{"step": global_step}}))
+                    # if self.args.local_rank in [-1, 0] and self.args.logging_steps > 0 and global_step % self.args.logging_steps == 0:
+                    #     loss_scalar = (tr_loss - logging_loss) / self.args.logging_steps
+                    #     self.write_tensorboard_scalar(loss_scalar=loss_scalar, np_predicts=np_predicts, np_labels=np_labels, step=global_step)
+                    #     np_predicts = None
+                    #     np_labels = None
+                    #     logging_loss = tr_loss
 
                     if self.args.local_rank in [-1, 0] and self.args.save_steps > 0 and global_step % self.args.save_steps == 0 \
                             and not self.args.tune_hyper:
@@ -309,10 +282,51 @@ class FrameworkManager:
                     epoch_iterator.close()
                     break
 
+            loss_scalar = (tr_loss - logging_loss) / self.args.logging_steps
+            self.write_tensorboard_scalar(loss_scalar=loss_scalar, np_predicts=np_predicts, np_labels=np_labels,
+                                          step=epoch_index)
+            np_predicts = None
+            np_labels = None
+            logging_loss = tr_loss
+
         if self.args.local_rank in [-1, 0]:
             tb_writer.close()
         # file_tool.save_data_pickle(loss_list, 'analysis/baseline/run_on_my_pc/cuda/loss_list.pkl')
         return global_step, tr_loss / global_step
+
+    def write_tensorboard_scalar(self, loss_scalar, np_predicts, np_labels, step):
+        logs = {}
+        if (
+                self.args.local_rank == -1 and self.args.evaluate_during_training
+        ):  # Only evaluate when single GPU otherwise metrics may not average well
+            dev_results = self.evaluate(dev_flag=True, test_flag=False, prefix="step({})_during_training)".format(step))
+            test_results = self.evaluate(dev_flag=False, test_flag=True, prefix="step({})_during_training".format(step))
+
+            for dev_key, test_key in zip(dev_results, test_results):
+                dev_log_key = "{}_dev".format(dev_key)
+                logs[dev_log_key] = dev_results[dev_key]
+
+                test_log_key = "{}_test".format(test_key)
+                logs[test_log_key] = test_results[test_key]
+
+            logs['dev_test_acc'] = (dev_results['acc'] + test_results['acc']) / 2
+
+        learning_rate_scalar = self.scheduler.get_last_lr()[0]
+        logs["learning_rate"] = learning_rate_scalar
+        logs["loss"] = loss_scalar
+
+        if self.args.output_mode == "classification":
+            np_predicts = np.argmax(np_predicts, axis=1)
+        elif self.args.output_mode == "regression":
+            np_predicts = np.squeeze(np_predicts)
+
+        metrics_result = self.glue_manager.compute_metrics(self.args.task_name, np_predicts, np_labels)
+        logs['acc_train'] = metrics_result['acc']
+
+        for key, value in logs.items():
+            self.tb_writer.add_scalar(key, value, step)
+        # print(json.dumps({**logs, **{"step": global_step}}))
+        self.logger.info(json.dumps({**logs, **{"step": step}}))
 
     def append_np_predict_label(self, predicts, labels, new_predicts, new_labels):
         if predicts is None:
@@ -330,6 +344,8 @@ class FrameworkManager:
 
         if dev_flag:
             prefix += "_dev"
+        elif test_flag:
+            prefix += "_test"
         else:
             prefix += "_train"
         # Loop to handle MNLI double evaluation (matched, mis-matched)
@@ -407,6 +423,10 @@ class FrameworkManager:
         return results
 
     def run(self):
+        self.args.tensorboard_logdir = file_tool.connect_path('tensorboard',
+                                                              str(socket.gethostname()),
+                                                              self.args.framework_name,
+                                                              self.framework.get_name_in_result_path())
         self._print_args()
         # Training
         if self.args.do_train:

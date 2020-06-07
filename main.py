@@ -10,6 +10,7 @@ import logging
 # import analysis.mrpc_analysis as mrpc_analysis
 from model import MODEL_CLASSES, ALL_MODELS
 from glue.glue_manager import glue_processors as processors
+import framework.Elaboration_Fast as EF
 import os
 
 def create_args():
@@ -261,10 +262,10 @@ def create_args():
     args.max_encoder_seq_length = args.max_seq_length
 
     args.base_learning_rate = 2e-5
-
+    args.train_batch_size = args.per_gpu_train_batch_size * max(1, args.n_gpu)
     if args.framework_name in args.framework_with_gcn:
         args.gcn_hidden_dim = args.encoder_hidden_dim
-        args.gcn_gate_flag = True
+        args.gcn_gate_flag = False
         args.gcn_norm_item = 0.5
         args.gcn_self_loop_flag = True
         args.gcn_group_layer_limit_flag = False
@@ -276,6 +277,13 @@ def create_args():
 
         if not args.without_concatenate_input_for_gcn_hidden:
             args.fully_scales[0] += args.gcn_hidden_dim
+
+        args.gcn_attention = True
+        if args.gcn_attention:
+            args.gat_dropout = 0.4
+            args.gat_alpha = 0.2
+            args.gat_num_of_heads = 1
+
     else:
         del args.gcn_layer
 
@@ -302,6 +310,8 @@ def run_hyperor(args):
 
     hyr = hyperor.Hyperor(args)
     hyr.tune_hyper_parameter()
+
+    del hyr
 
 
 def analyze_hyper_parameters(args):
@@ -333,11 +343,12 @@ def analyze_hyper_parameters(args):
 
 def main():
     args = create_args()
+    EF.run(args)
     # if args.tune_hyper:
     #     run_hyperor(args)
     # else:
     #     run_framework(args)
-    analyze_hyper_parameters(args)
+    # analyze_hyper_parameters(args)
     # er_analysis.test()
     # mrpc_analysis.test()
     # corpus_test()

@@ -1,4 +1,5 @@
 import torch
+from .gat import GraphAttentionLayer
 
 
 class GCN(torch.nn.Module):
@@ -35,6 +36,11 @@ class GCN(torch.nn.Module):
         self.bias_out_list = torch.nn.ParameterList(self.get_para_list(self.layer * self.dep_kind_count,
                                                                        (self.hidden_dim, 1)))
 
+        self.weight_gate_in_list = None
+        self.weight_gate_out_list = None
+        self.bias_gate_in_list = None
+        self.bias_gate_out_list = None
+
         if self.gate_flag:
             self.weight_gate_in_list = torch.nn.ParameterList(self.get_para_list(self.layer * self.dep_kind_count,
                                                                                  (1, self.hidden_dim)))
@@ -46,15 +52,27 @@ class GCN(torch.nn.Module):
             self.bias_gate_out_list = torch.nn.ParameterList(self.get_para_list(self.layer * self.dep_kind_count,
                                                                                 (1, 1)))
 
+
         if self.self_loop_flag:
             self.weight_loop_list = torch.nn.ParameterList(self.get_para_list(self.layer,
                                                            (self.hidden_dim, self.hidden_dim)))
             if self.gate_flag:
                 self.weight_loop_gate_list = torch.nn.ParameterList(self.get_para_list(self.layer, (1, self.hidden_dim)))
 
+        if self.args.gcn_attention:
+            attentions = [torch.nn.ModuleList([GraphAttentionLayer(self.args, concat=True)
+                                               for _ in range(self.args.gat_num_of_heads)])
+                          for _ in range(self.layer)]
+
+            # attentions = [GraphAttentionLayer(self.args.gcn_hidden_dim, self.args.gcn_hidden_dim,
+            #                                   dropout=self.args.gat_dropout, alpha=self.args.gat_alpha, concat=True)
+            #               for _ in range(self.layer*self.args.gat_num_of_heads)]
+
+            self.attentions = torch.nn.ModuleList(attentions)
+
     def get_para_list(self, length, shape):
         return [
-            torch.nn.Parameter(torch.nn.init.xavier_normal_(torch.ones(*shape, device=self.device, requires_grad=True)))
+            torch.nn.Parameter(torch.nn.init.xavier_normal_(torch.ones(*shape, device=self.device)), requires_grad=True)
             for i in range(length)]
 
     def forward(self, sentences, adj_matrix):
@@ -79,7 +97,16 @@ class GCN(torch.nn.Module):
 
             relation = self.norm_item * gate * relation
 
-            relation = torch.bmm(relation, adj_matrix[:, d_kind])
+            if self.args.gcn_attention:
+                attention_heads = self.attentions[layer]
+                attention = 0
+                for head in attention_heads:
+                    attention += head(h.transpose(-1, -2), adj_matrix[:, d_kind], weight_list[index].expand([current_batch_size, -1, -1]))
+                attention /= len(attention_heads)
+                # relation = torch.bmm(relation, attention * adj_matrix[:, d_kind])
+                relation = torch.bmm(relation, attention)
+            else:
+                relation = torch.bmm(relation, adj_matrix[:, d_kind])
             return relation
 
         adj_matrix_in = adj_matrix

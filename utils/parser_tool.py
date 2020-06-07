@@ -191,15 +191,21 @@ def extra_parsed_sentence_dict_from_org_file(org_file):
 #     return parsed_sentence_dict
 
 def group_dependencies(parsing_sentence_dict):
+    unify_group_flag = True
     type_set = set()
     for sent_id, parsing_info in parsing_sentence_dict.items():
         for dependency in parsing_info['dependencies']:
             group = dependency2group_dict[dependency['name']]
+            if unify_group_flag:
+                group = "unify_group"
             dependency['name'] = group
             type_set.add(dependency['name'])
-
-    if len(type_set) != group_count:
-        raise ValueError
+    if unify_group_flag:
+        if len(type_set) != 1:
+            raise ValueError
+    else:
+        if len(type_set) != group_count:
+            raise ValueError
     return parsing_sentence_dict
 
 def delete_root_dependency(parsing_sentence_dict):
