@@ -41,7 +41,7 @@ class Sentence:
         return self.syntax_info['dependencies'].copy()
 
 
-class Corpus:
+class Corpus: 
     def __init__(self):
         super().__init__()
         self.train_example_dict = None
