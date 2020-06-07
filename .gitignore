@@ -30,5 +30,5 @@ result/visualization
 /**/glue_data
 *.zip
 /**/*.zip
-corpus/discourse
+corpus/discourse/data
 
